@@ -3,9 +3,10 @@ package main
 import (
 	"context"
 	"encoding/base64"
-	"github.com/yago-123/wg-punch/pkg/util"
 	"log"
 	"time"
+
+	"github.com/yago-123/wg-punch/pkg/util"
 
 	rendClient "github.com/yago-123/wg-punch/pkg/rendezvous/client"
 	"github.com/yago-123/wg-punch/pkg/rendezvous/types"
@@ -26,7 +27,7 @@ func main() {
 	log.Printf("- Public : %s\n", base64.StdEncoding.EncodeToString(pubKey[:]))
 
 	// Create rendezvous client
-	client := rendClient.NewRendezvousClient("http://localhost:8080")
+	client := rendClient.NewRendezvous("http://rendezvous.yago.ninja:7777")
 
 	// Register this peer
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -38,7 +39,7 @@ func main() {
 	}
 
 	// Get public endpoint using STUN servers
-	endpoint, err := util.GetPublicEndpoint(stunServers, 51820)
+	endpoint, err := util.GetPublicEndpoint(stunServers)
 	if err != nil {
 		log.Fatalf("failed to get public endpoint: %v", err)
 	}
@@ -47,7 +48,7 @@ func main() {
 		PeerID:     "peer-a",
 		PublicKey:  base64.StdEncoding.EncodeToString(pubKey[:]),
 		AllowedIPs: []string{"10.0.0.2/32"},
-		Endpoint:   endpoint,
+		Endpoint:   endpoint.String(),
 	})
 	if err != nil {
 		log.Fatalf("register failed: %v", err)

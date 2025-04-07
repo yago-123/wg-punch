@@ -9,11 +9,11 @@ import (
 
 // GetPublicEndpoint tries the provided STUN servers to discover the public-facing IP.
 // Returns the endpoint as "IP:port", or an error if all servers fail.
-func GetPublicEndpoint(servers []string, port int) (string, error) {
+func GetPublicEndpoint(servers []string) (*net.UDPAddr, error) {
 	var lastErr error
 
 	for _, server := range servers {
-		endpoint, err := trySTUNServer(server, port)
+		endpoint, err := trySTUNServer(server)
 		if err == nil {
 			return endpoint, nil
 		}
@@ -21,20 +21,20 @@ func GetPublicEndpoint(servers []string, port int) (string, error) {
 		lastErr = err
 	}
 
-	return "", fmt.Errorf("all STUN servers failed: %w", lastErr)
+	return nil, fmt.Errorf("all STUN servers failed: %w", lastErr)
 }
 
-func trySTUNServer(server string, port int) (string, error) {
+func trySTUNServer(server string) (*net.UDPAddr, error) {
 	conn, err := net.Dial("udp", server)
 	if err != nil {
-		return "", fmt.Errorf("error dialing STUN server %s: %w", server, err)
+		return nil, fmt.Errorf("error dialing STUN server %s: %w", server, err)
 	}
 	defer conn.Close()
 
 	// Create a new STUN client
 	client, err := stun.NewClient(conn)
 	if err != nil {
-		return "", fmt.Errorf("error creating STUN client: %w", err)
+		return nil, fmt.Errorf("error creating STUN client: %w", err)
 	}
 	defer client.Close()
 
@@ -49,8 +49,12 @@ func trySTUNServer(server string, port int) (string, error) {
 			err = fmt.Errorf("failed to get XOR-MAPPED-ADDRESS: %w", getErr)
 		}
 	}); errStun != nil {
-		return "", fmt.Errorf("STUN request to %s failed: %w", server, errStun)
+		return nil, fmt.Errorf("STUN request to %s failed: %w", server, errStun)
 	}
 
-	return fmt.Sprintf("%s:%d", xorAddr.IP, port), nil
+	return &net.UDPAddr{
+		IP:   xorAddr.IP,
+		Port: xorAddr.Port,
+		Zone: "", // leave empty unless you have a link-local IPv6
+	}, nil
 }

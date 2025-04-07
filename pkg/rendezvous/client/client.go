@@ -5,10 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yago-123/wg-punch/pkg/rendezvous/types"
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/yago-123/wg-punch/pkg/rendezvous/types"
 )
 
 const RendezvousClientTimeout = 5 * time.Second
@@ -23,7 +24,7 @@ type Client struct {
 	client  *http.Client
 }
 
-func NewRendezvousClient(baseURL string) Rendezvous {
+func NewRendezvous(baseURL string) Rendezvous {
 	return &Client{
 		baseURL: baseURL,
 		client:  &http.Client{Timeout: RendezvousClientTimeout},

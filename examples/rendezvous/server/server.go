@@ -17,10 +17,10 @@ func main() {
 	rendezvousStore := store.NewMemoryStore()
 
 	// Initialize the server
-	srv := server.NewRendezvousServer(rendezvousStore)
+	srv := server.NewRendezvous(rendezvousStore)
 
 	// Start the server
-	addr := "0.0.0.0:8080"
+	addr := "0.0.0.0:7777"
 	if err := srv.Start(addr); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}

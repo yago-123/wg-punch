@@ -22,7 +22,7 @@ type RendezvousServer struct {
 	httpServer *http.Server
 }
 
-func NewRendezvousServer(s store.Store) *RendezvousServer {
+func NewRendezvous(s store.Store) *RendezvousServer {
 	return &RendezvousServer{
 		handlers: NewHandler(s),
 	}

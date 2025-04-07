@@ -2,8 +2,9 @@ package wgpunch
 
 import (
 	"context"
-	"github.com/yago-123/wg-punch/pkg/peer"
 	"net"
+
+	"github.com/yago-123/wg-punch/pkg/peer"
 )
 
 type Tunnel interface {

@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"encoding/base64"
-	wgpunch "github.com/yago-123/wg-punch/pkg"
-	"github.com/yago-123/wg-punch/pkg/rendezvous/client"
 	"log"
 	"time"
+
+	wgpunch "github.com/yago-123/wg-punch/pkg"
+	"github.com/yago-123/wg-punch/pkg/rendezvous/client"
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
@@ -45,7 +46,7 @@ func main() {
 	})
 
 	// Rendezvous server client (registers and discovers peer IPs)
-	rendezvous := client.NewRendezvousClient("https://rendezvous.com")
+	rendezvous := client.NewRendezvous("http://rendezvous.yago.ninja:7777")
 
 	// Combine everything into the connector
 	conn := wgpunch.NewConnector(puncher, tunnel, rendezvous)

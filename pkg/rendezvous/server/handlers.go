@@ -1,11 +1,12 @@
 package server
 
 import (
+	"net"
+	"net/http"
+
 	"github.com/yago-123/wg-punch/pkg/peer"
 	"github.com/yago-123/wg-punch/pkg/rendezvous/store"
 	"github.com/yago-123/wg-punch/pkg/rendezvous/types"
-	"net"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 )

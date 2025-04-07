@@ -5,10 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yago-123/wg-punch/pkg/rendezvous/types"
 	"net"
 	"net/http"
 	"time"
-	"wg-punch/pkg/rendezvous/types"
 )
 
 const RendezvousClientTimeout = 5 * time.Second

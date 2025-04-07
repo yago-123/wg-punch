@@ -8,9 +8,11 @@ lint:
 
 .PHONY: imports
 imports:
+	@echo "Running imports..."
 	@find . -name "*.go" | xargs goimports -w
 
 .PHONY: fmt
 fmt:
+	@echo "Running fmt..."
 	@go fmt ./...
 

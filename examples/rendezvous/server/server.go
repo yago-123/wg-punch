@@ -8,8 +8,8 @@ import (
 	"syscall"
 	"time"
 
-	"wg-punch/pkg/rendezvous/server"
-	"wg-punch/pkg/rendezvous/store"
+	"github.com/yago-123/wg-punch/pkg/rendezvous/server"
+	"github.com/yago-123/wg-punch/pkg/rendezvous/store"
 )
 
 func main() {

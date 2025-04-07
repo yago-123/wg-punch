@@ -1,8 +1,8 @@
 package store
 
 import (
+	"github.com/yago-123/wg-punch/pkg/peer"
 	"sync"
-	"wg-punch/pkg/peer"
 )
 
 type MemoryStore struct {

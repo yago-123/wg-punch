@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"wg-punch/pkg/rendezvous/store"
+	"github.com/yago-123/wg-punch/pkg/rendezvous/store"
 
 	"github.com/gin-gonic/gin"
 )

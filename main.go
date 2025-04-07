@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 	"encoding/base64"
+	wgpunch "github.com/yago-123/wg-punch/pkg"
+	"github.com/yago-123/wg-punch/pkg/rendezvous/client"
 	"log"
 	"time"
-	wgpunch "wg-punch/pkg"
-	"wg-punch/pkg/rendezvous/client"
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )

@@ -2,8 +2,8 @@ package wgpunch
 
 import (
 	"context"
+	"github.com/yago-123/wg-punch/pkg/rendezvous/client"
 	"net"
-	"wg-punch/pkg/rendezvous/client"
 )
 
 type Connector struct {

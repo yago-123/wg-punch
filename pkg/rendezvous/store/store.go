@@ -1,6 +1,6 @@
 package store
 
-import "wg-punch/pkg/peer"
+import "github.com/yago-123/wg-punch/pkg/peer"
 
 type Store interface {
 	Register(peerID string, info peer.Info) error

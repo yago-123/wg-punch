@@ -1,4 +1,4 @@
-module wg-punch
+module github.com/yago-123/wg-punch
 
 go 1.24.1
 

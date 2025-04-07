@@ -1,16 +1,88 @@
 package client
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"net"
+	"net/http"
+	"time"
+	"wg-punch/pkg/rendezvous/types"
 )
 
-type RendezvousClient interface {
-	Register(ctx context.Context, key string, port int) error
-	Discover(ctx context.Context, key string) (*net.UDPAddr, error)
+type Rendezvous interface {
+	Register(ctx context.Context, req types.RegisterRequest) error
+	Discover(ctx context.Context, peerID string) (*types.PeerResponse, *net.UDPAddr, error)
 }
 
-func NewRendezvousClient(url string) RendezvousClient {
-	// returns HTTP or gRPC implementation
+type Client struct {
+	baseURL string
+	client  *http.Client
+}
+
+func NewRendezvousClient(baseURL string) Rendezvous {
+	return &Client{
+		baseURL: baseURL,
+		client:  &http.Client{Timeout: 5 * time.Second},
+	}
+}
+
+// Register registers a peer with the rendezvous server
+func (c *Client) Register(ctx context.Context, req types.RegisterRequest) error {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("marshal register request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/register", bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("create http request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.client.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("send register request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("register failed with status: %s", resp.Status)
+	}
+
 	return nil
+}
+
+// Discover retrieves the peer information from the rendezvous server
+func (c *Client) Discover(ctx context.Context, peerID string) (*types.PeerResponse, *net.UDPAddr, error) {
+	url := fmt.Sprintf("%s/peer/%s", c.baseURL, peerID)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("create discover request: %w", err)
+	}
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, nil, fmt.Errorf("send discover request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, nil, fmt.Errorf("discover failed with status: %s", resp.Status)
+	}
+
+	var peerResp types.PeerResponse
+	if err := json.NewDecoder(resp.Body).Decode(&peerResp); err != nil {
+		return nil, nil, fmt.Errorf("decode response: %w", err)
+	}
+
+	// Convert endpoint into UDP address
+	udpAddr, err := net.ResolveUDPAddr("udp", peerResp.Endpoint)
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid endpoint in response: %w", err)
+	}
+
+	return &peerResp, udpAddr, nil
 }

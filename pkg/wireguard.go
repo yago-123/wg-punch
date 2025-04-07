@@ -3,10 +3,11 @@ package wgpunch
 import (
 	"context"
 	"net"
+	"wg-punch/pkg/peer"
 )
 
 type Tunnel interface {
-	Start(ctx context.Context, conn *net.UDPConn, localKey, remoteKey string, peer PeerInfo) error
+	Start(ctx context.Context, conn *net.UDPConn, localKey, remoteKey string, peer peer.PeerInfo) error
 	Close() error
 }
 

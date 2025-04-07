@@ -1,1 +1,1 @@
-# WireGuard Hole Punch
+# wg-punch

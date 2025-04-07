@@ -1,5 +1,5 @@
 .PHONY: all
-all: lint imports fmt
+all: imports fmt lint
 
 .PHONY: lint
 lint:

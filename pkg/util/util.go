@@ -40,7 +40,7 @@ func trySTUNServer(server string, port int) (string, error) {
 
 	// Send a binding request to the STUN server for determining the public IP
 	var xorAddr stun.XORMappedAddress
-	if err := client.Do(stun.MustBuild(stun.TransactionID, stun.BindingRequest), func(res stun.Event) {
+	if errStun := client.Do(stun.MustBuild(stun.TransactionID, stun.BindingRequest), func(res stun.Event) {
 		if res.Error != nil {
 			err = res.Error
 			return
@@ -48,8 +48,8 @@ func trySTUNServer(server string, port int) (string, error) {
 		if getErr := xorAddr.GetFrom(res.Message); getErr != nil {
 			err = fmt.Errorf("failed to get XOR-MAPPED-ADDRESS: %w", getErr)
 		}
-	}); err != nil {
-		return "", fmt.Errorf("STUN request to %s failed: %w", server, err)
+	}); errStun != nil {
+		return "", fmt.Errorf("STUN request to %s failed: %w", server, errStun)
 	}
 
 	return fmt.Sprintf("%s:%d", xorAddr.IP, port), nil

@@ -46,21 +46,21 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 	var allowed []net.IPNet
 	for _, cidr := range req.AllowedIPs {
 		// Parse allowed IP CIDR
-		_, ipnet, err := net.ParseCIDR(cidr)
-		if err != nil {
+		_, ipnet, errCIDR := net.ParseCIDR(cidr)
+		if errCIDR != nil {
 			c.String(http.StatusBadRequest, "invalid CIDR in allowed_ips")
 			return
 		}
 		allowed = append(allowed, *ipnet)
 	}
 
-	info := peer.PeerInfo{
+	info := peer.Info{
 		PublicKey:  req.PublicKey,
 		Endpoint:   udpAddr,
 		AllowedIPs: allowed,
 	}
 
-	if err := h.store.Register(req.PeerID, info); err != nil {
+	if errStore := h.store.Register(req.PeerID, info); errStore != nil {
 		c.String(http.StatusInternalServerError, "failed to register peer")
 		return
 	}

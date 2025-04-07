@@ -11,6 +11,8 @@ import (
 	"wg-punch/pkg/rendezvous/types"
 )
 
+const RendezvousClientTimeout = 5 * time.Second
+
 type Rendezvous interface {
 	Register(ctx context.Context, req types.RegisterRequest) error
 	Discover(ctx context.Context, peerID string) (*types.PeerResponse, *net.UDPAddr, error)
@@ -24,7 +26,7 @@ type Client struct {
 func NewRendezvousClient(baseURL string) Rendezvous {
 	return &Client{
 		baseURL: baseURL,
-		client:  &http.Client{Timeout: 5 * time.Second},
+		client:  &http.Client{Timeout: RendezvousClientTimeout},
 	}
 }
 
@@ -74,8 +76,8 @@ func (c *Client) Discover(ctx context.Context, peerID string) (*types.PeerRespon
 	}
 
 	var peerResp types.PeerResponse
-	if err := json.NewDecoder(resp.Body).Decode(&peerResp); err != nil {
-		return nil, nil, fmt.Errorf("decode response: %w", err)
+	if errJSON := json.NewDecoder(resp.Body).Decode(&peerResp); errJSON != nil {
+		return nil, nil, fmt.Errorf("decode response: %w", errJSON)
 	}
 
 	// Convert endpoint into UDP address

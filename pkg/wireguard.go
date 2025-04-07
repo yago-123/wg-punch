@@ -7,7 +7,7 @@ import (
 )
 
 type Tunnel interface {
-	Start(ctx context.Context, conn *net.UDPConn, localKey, remoteKey string, peer peer.PeerInfo) error
+	Start(ctx context.Context, conn *net.UDPConn, localKey, remoteKey string, peer peer.Info) error
 	Close() error
 }
 
@@ -17,7 +17,7 @@ type TunnelConfig struct {
 	ListenPort int
 }
 
-func NewTunnel(cfg *TunnelConfig) Tunnel {
+func NewTunnel(_ *TunnelConfig) Tunnel {
 	// return implementation with wireguard-go
 	return nil
 }

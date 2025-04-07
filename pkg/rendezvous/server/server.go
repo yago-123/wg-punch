@@ -3,10 +3,18 @@ package server
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"wg-punch/pkg/rendezvous/store"
 
 	"github.com/gin-gonic/gin"
+)
+
+const (
+	ServerReadTimeout  = 5 * time.Second
+	ServerWriteTimeout = 5 * time.Second
+	ServerIdleTimeout  = 10 * time.Second
+	MaxHeaderBytes     = 1 << 20
 )
 
 type RendezvousServer struct {
@@ -27,8 +35,12 @@ func (s *RendezvousServer) Start(addr string) error {
 	r.GET("/peer/:peer_id", s.handlers.LookupHandler)
 
 	s.httpServer = &http.Server{
-		Addr:    addr,
-		Handler: r,
+		Addr:           addr,
+		Handler:        r,
+		ReadTimeout:    ServerReadTimeout,
+		WriteTimeout:   ServerWriteTimeout,
+		IdleTimeout:    ServerIdleTimeout,
+		MaxHeaderBytes: MaxHeaderBytes,
 	}
 
 	go func() {

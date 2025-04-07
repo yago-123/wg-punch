@@ -4,9 +4,8 @@ import (
 	"context"
 	"log"
 	"time"
-	"wg-punch/pkg/rendezvous/client"
-
 	wgpunch "wg-punch/pkg"
+	"wg-punch/pkg/rendezvous/client"
 )
 
 func main() {

@@ -9,13 +9,13 @@ import (
 type Connector struct {
 	Puncher    Puncher
 	Tunnel     Tunnel
-	Rendezvous client.RendezvousClient
+	Rendezvous client.Rendezvous
 }
 
-func NewConnector(p Puncher, t Tunnel, r client.RendezvousClient) *Connector {
+func NewConnector(p Puncher, t Tunnel, r client.Rendezvous) *Connector {
 	return &Connector{Puncher: p, Tunnel: t, Rendezvous: r}
 }
 
-func (c *Connector) Connect(ctx context.Context, peerKey string, pubKey string) (net.Conn, error) {
+func (c *Connector) Connect(_ context.Context, peerKey string, pubKey string) (net.Conn, error) {
 	return nil, nil
 }

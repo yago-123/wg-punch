@@ -17,7 +17,7 @@ type TunnelConfig struct {
 	ListenPort int
 }
 
-func NewTunnel(cfg TunnelConfig) Tunnel {
+func NewTunnel(cfg *TunnelConfig) Tunnel {
 	// return implementation with wireguard-go
 	return nil
 }

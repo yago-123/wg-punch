@@ -4,16 +4,19 @@ import (
 	"context"
 	"net"
 
-	"github.com/yago-123/wg-punch/pkg/rendezvous/client"
+	"github.com/yago-123/wg-punch/pkg/puncher"
+	"github.com/yago-123/wg-punch/pkg/wg"
+
+	"github.com/yago-123/wg-punch/pkg/rendez/client"
 )
 
 type Connector struct {
-	Puncher    Puncher
-	Tunnel     Tunnel
+	Puncher    puncher.Puncher
+	Tunnel     wg.Tunnel
 	Rendezvous client.Rendezvous
 }
 
-func NewConnector(p Puncher, t Tunnel, r client.Rendezvous) *Connector {
+func NewConnector(p puncher.Puncher, t wg.Tunnel, r client.Rendezvous) *Connector {
 	return &Connector{Puncher: p, Tunnel: t, Rendezvous: r}
 }
 

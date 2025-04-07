@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/yago-123/wg-punch/pkg/rendezvous/store"
+	"github.com/yago-123/wg-punch/pkg/rendez/store"
 
 	"github.com/gin-gonic/gin"
 )
@@ -31,6 +31,7 @@ func NewRendezvous(s store.Store) *RendezvousServer {
 func (s *RendezvousServer) Start(addr string) error {
 	r := gin.Default()
 
+	// todo(): add API versioning
 	r.POST("/register", s.handlers.RegisterHandler)
 	r.GET("/peer/:peer_id", s.handlers.LookupHandler)
 

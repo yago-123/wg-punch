@@ -8,8 +8,8 @@ import (
 
 	"github.com/yago-123/wg-punch/pkg/util"
 
-	rendClient "github.com/yago-123/wg-punch/pkg/rendezvous/client"
-	"github.com/yago-123/wg-punch/pkg/rendezvous/types"
+	rendClient "github.com/yago-123/wg-punch/pkg/rendez/client"
+	"github.com/yago-123/wg-punch/pkg/rendez/types"
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )

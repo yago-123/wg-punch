@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/yago-123/wg-punch/pkg/peer"
-	"github.com/yago-123/wg-punch/pkg/rendezvous/store"
-	"github.com/yago-123/wg-punch/pkg/rendezvous/types"
+	"github.com/yago-123/wg-punch/pkg/rendez/store"
+	"github.com/yago-123/wg-punch/pkg/rendez/types"
 
 	"github.com/gin-gonic/gin"
 )

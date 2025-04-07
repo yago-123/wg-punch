@@ -3,11 +3,14 @@ package main
 import (
 	"context"
 	"encoding/base64"
+	"github.com/yago-123/wg-punch/pkg/puncher"
 	"log"
 	"time"
 
+	"github.com/yago-123/wg-punch/pkg/wg"
+
 	wgpunch "github.com/yago-123/wg-punch/pkg"
-	"github.com/yago-123/wg-punch/pkg/rendezvous/client"
+	"github.com/yago-123/wg-punch/pkg/rendez/client"
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
@@ -36,13 +39,15 @@ func main() {
 	}
 
 	// STUN-based hole puncher
-	puncher := wgpunch.NewPuncher(stunServers)
+	puncher := puncher.NewPuncher(stunServers)
 
 	// WireGuard interface using wireguard-go in userspace
-	tunnel := wgpunch.NewTunnel(&wgpunch.TunnelConfig{
-		PrivateKey: localPrivateKey,
-		ListenPort: WireGuardListenPort,
-		Interface:  "wg0",
+	tunnel := wg.NewTunnel(&wg.TunnelConfig{
+		PrivateKey:        localPrivateKey,
+		Interface:         "wg0",
+		ListenPort:        WireGuardListenPort,
+		ReplacePeer:       true,
+		KeepAliveInterval: 25 * time.Second,
 	})
 
 	// Rendezvous server client (registers and discovers peer IPs)
@@ -50,6 +55,9 @@ func main() {
 
 	// Combine everything into the connector
 	conn := wgpunch.NewConnector(puncher, tunnel, rendezvous)
+
+	// todo(): think about where to put the cancel of the tunnel itself
+	defer tunnel.Close()
 
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 

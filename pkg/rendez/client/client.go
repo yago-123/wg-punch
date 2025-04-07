@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/yago-123/wg-punch/pkg/rendezvous/types"
+	"github.com/yago-123/wg-punch/pkg/rendez/types"
 )
 
 const RendezvousClientTimeout = 5 * time.Second
@@ -31,7 +31,7 @@ func NewRendezvous(baseURL string) Rendezvous {
 	}
 }
 
-// Register registers a peer with the rendezvous server
+// Register registers a peer with the rendez server
 func (c *Client) Register(ctx context.Context, req types.RegisterRequest) error {
 	body, err := json.Marshal(req)
 	if err != nil {

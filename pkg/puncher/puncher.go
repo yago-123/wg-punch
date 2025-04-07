@@ -1,4 +1,4 @@
-package wgpunch
+package puncher
 
 import (
 	"context"

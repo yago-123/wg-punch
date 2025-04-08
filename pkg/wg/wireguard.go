@@ -1,7 +1,6 @@
 package wg
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"time"
@@ -13,7 +12,7 @@ import (
 )
 
 type Tunnel interface {
-	Start(ctx context.Context, conn *net.UDPConn, localPrivKey string, peer peer.Info) error
+	Start(conn *net.UDPConn, localPrivKey string, peer peer.Info) error
 	Close() error
 }
 
@@ -36,7 +35,7 @@ func NewTunnel(cfg *TunnelConfig) Tunnel {
 	}
 }
 
-func (wgt *wgTunnel) Start(ctx context.Context, conn *net.UDPConn, localPrivKey string, peer peer.Info) error {
+func (wgt *wgTunnel) Start(conn *net.UDPConn, localPrivKey string, peer peer.Info) error {
 	client, err := wgctrl.New()
 	if err != nil {
 		return fmt.Errorf("failed to open wgctrl client: %w", err)

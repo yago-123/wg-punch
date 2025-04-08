@@ -3,9 +3,10 @@ package main
 import (
 	"context"
 	"encoding/base64"
-	"github.com/yago-123/wg-punch/pkg/puncher"
 	"log"
 	"time"
+
+	"github.com/yago-123/wg-punch/pkg/puncher"
 
 	"github.com/yago-123/wg-punch/pkg/wg"
 
@@ -41,7 +42,7 @@ func main() {
 	// STUN-based hole puncher
 	puncher := puncher.NewPuncher(stunServers)
 
-	// WireGuard interface using wireguard-go in userspace
+	// WireGuard interface using WireGuard
 	tunnel := wg.NewTunnel(&wg.TunnelConfig{
 		PrivateKey:        localPrivateKey,
 		Interface:         "wg0",

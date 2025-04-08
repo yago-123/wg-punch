@@ -14,7 +14,7 @@ const (
 
 type Puncher interface {
 	Punch(ctx context.Context, localAddr string, remoteHint *net.UDPAddr) (*net.UDPConn, error)
-	PublicAddr() (*net.UDPAddr, error)
+	PublicAddr(ctx context.Context) (*net.UDPAddr, error)
 }
 
 type puncher struct {
@@ -55,6 +55,6 @@ func (p *puncher) Punch(ctx context.Context, localAddr string, remoteHint *net.U
 	return conn, nil
 }
 
-func (p *puncher) PublicAddr() (*net.UDPAddr, error) {
-	return util.GetPublicEndpoint(p.stunServers)
+func (p *puncher) PublicAddr(ctx context.Context) (*net.UDPAddr, error) {
+	return util.GetPublicEndpoint(ctx, p.stunServers)
 }

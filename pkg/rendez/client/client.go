@@ -102,7 +102,6 @@ func (c *Client) WaitForPeer(ctx context.Context, peerID string, interval time.D
 		case <-ticker.C:
 			res, addr, err := c.Discover(ctx, peerID)
 			if err == nil && res != nil && addr != nil {
-
 				udpAddr, errUDP := net.ResolveUDPAddr("udp", res.Endpoint)
 				if errUDP != nil {
 					return nil, nil, fmt.Errorf("invalid endpoint in response: %w", err)

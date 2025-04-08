@@ -39,7 +39,7 @@ func main() {
 	}
 
 	// Get public endpoint using STUN servers
-	endpoint, err := util.GetPublicEndpoint(stunServers)
+	endpoint, err := util.GetPublicEndpoint(ctx, stunServers)
 	if err != nil {
 		log.Fatalf("failed to get public endpoint: %v", err)
 	}
@@ -56,9 +56,6 @@ func main() {
 	log.Println("Registered successfully")
 
 	// Discover remote peer
-	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
 	resp, udpAddr, err := client.Discover(ctx, "peer-a")
 	if err != nil {
 		log.Fatalf("discover failed: %v", err)

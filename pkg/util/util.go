@@ -8,6 +8,22 @@ import (
 	"github.com/pion/stun"
 )
 
+// ConvertAllowedIPs takes a slice of CIDR strings and converts them to a slice of net.IPNet.
+// It returns an error if any string is not a valid CIDR.
+func ConvertAllowedIPs(allowedIPs []string) ([]net.IPNet, error) {
+	var result []net.IPNet
+
+	for _, cidr := range allowedIPs {
+		_, ipNet, err := net.ParseCIDR(cidr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid CIDR %q: %w", cidr, err)
+		}
+		result = append(result, *ipNet)
+	}
+
+	return result, nil
+}
+
 // GetPublicEndpoint tries the provided STUN servers to discover the public-facing IP.
 // Returns the endpoint as "IP:port", or an error if all servers fail.
 func GetPublicEndpoint(ctx context.Context, servers []string) (*net.UDPAddr, error) {
@@ -26,6 +42,8 @@ func GetPublicEndpoint(ctx context.Context, servers []string) (*net.UDPAddr, err
 }
 
 func trySTUNServer(ctx context.Context, server string) (*net.UDPAddr, error) {
+	var err error
+
 	dialer := &net.Dialer{}
 	conn, err := dialer.DialContext(ctx, "udp", server)
 	if err != nil {
@@ -44,7 +62,7 @@ func trySTUNServer(ctx context.Context, server string) (*net.UDPAddr, error) {
 
 	go func() {
 		var xorAddr stun.XORMappedAddress
-		err := client.Do(stun.MustBuild(stun.TransactionID, stun.BindingRequest), func(res stun.Event) {
+		err = client.Do(stun.MustBuild(stun.TransactionID, stun.BindingRequest), func(res stun.Event) {
 			if res.Error != nil {
 				errCh <- res.Error
 				return
@@ -67,7 +85,7 @@ func trySTUNServer(ctx context.Context, server string) (*net.UDPAddr, error) {
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
-	case err := <-errCh:
+	case err = <-errCh:
 		return nil, err
 	case addr := <-resultCh:
 		return addr, nil

@@ -17,8 +17,11 @@ import (
 )
 
 const (
-	Timeout             = 30 * time.Second
-	WireGuardListenPort = 51820
+	ContextTimeout = 30 * time.Second
+
+	WireGuardListenPort        = 51820
+	WireGuardInterfaceName     = "wg0"
+	WireGuardKeepAliveInterval = 25 * time.Second
 )
 
 func main() {
@@ -30,8 +33,8 @@ func main() {
 	pubKey := privKey.PublicKey()
 
 	// Your local WireGuard keys
-	localPrivateKey := base64.StdEncoding.EncodeToString(privKey[:])
-	peerPublicKey := base64.StdEncoding.EncodeToString(pubKey[:])
+	localPrivKey := base64.StdEncoding.EncodeToString(privKey[:])
+	localPubKey := base64.StdEncoding.EncodeToString(pubKey[:])
 
 	// Example STUN server list (used to discover public IP/port)
 	var stunServers = []string{
@@ -44,28 +47,28 @@ func main() {
 
 	// WireGuard interface using WireGuard
 	tunnel := wg.NewTunnel(&wg.TunnelConfig{
-		PrivateKey:        localPrivateKey,
-		Interface:         "wg0",
+		PrivateKey:        localPrivKey,
+		Interface:         WireGuardInterfaceName,
 		ListenPort:        WireGuardListenPort,
 		ReplacePeer:       true,
-		KeepAliveInterval: 25 * time.Second,
+		KeepAliveInterval: WireGuardKeepAliveInterval,
 	})
 
 	// Rendezvous server client (registers and discovers peer IPs)
 	rendezvous := client.NewRendezvous("http://rendezvous.yago.ninja:7777")
 
 	// Combine everything into the connector
-	conn := wgpunch.NewConnector(puncher, tunnel, rendezvous)
+	conn := wgpunch.NewConnector("local-peer", puncher, tunnel, rendezvous, 1*time.Second)
 
 	// todo(): think about where to put the cancel of the tunnel itself
 	defer tunnel.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), ContextTimeout)
 
 	// Connect to peer using a shared peer ID (both sides use same ID)
-	netConn, err := conn.Connect(ctx, "peer-id-123", peerPublicKey)
+	netConn, err := conn.Connect(ctx, "peer-id-123", localPrivKey, localPubKey)
 	if err != nil {
-		log.Fatal("failed to connect to peer:", err)
+		log.Fatalf("failed to connect to peer: %w", err)
 	}
 
 	defer cancel()

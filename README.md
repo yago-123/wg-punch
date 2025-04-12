@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"log"
 	"time"
-	wgpunch "wg-punch/pkg"
 	"wg-punch/pkg/rendezvous/client"
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"

@@ -1,4 +1,4 @@
-package wgpunch
+package connect
 
 import (
 	"context"
@@ -44,10 +44,10 @@ func (c *Connector) Connect(ctx context.Context, remotePeerID, localPrivKey, loc
 	// Register local peer in rendezvous server
 	if errRendez := c.rendezClient.Register(ctx, types.RegisterRequest{
 		PeerID:    c.localPeerID,
-		PublicKey: localPubKey,         // Base64 or hex string
-		Endpoint:  publicAddr.String(), // e.g., "1.2.3.4:55555"
+		PublicKey: localPubKey,
+		Endpoint:  publicAddr.String(),
 		// todo(): adjust AllowedIPs to needs and via argument or config
-		AllowedIPs: []string{"10.0.0.42/32"}, // Your virtual IP
+		AllowedIPs: []string{"10.0.0.42/32"},
 	}); errRendez != nil {
 		return nil, fmt.Errorf("failed to register with rendezvous server: %w", errRendez)
 	}
@@ -65,7 +65,8 @@ func (c *Connector) Connect(ctx context.Context, remotePeerID, localPrivKey, loc
 	}
 
 	// Create UDP connection on local public IP
-	conn, err := c.puncher.Punch(ctx, publicAddr.IP.String(), endpoint)
+	// todo() : make localAddr configurable
+	conn, err := c.puncher.Punch(ctx, "0.0.0.0", endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to punch: %w", err)
 	}

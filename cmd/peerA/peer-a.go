@@ -6,14 +6,10 @@ import (
 	"log"
 	"time"
 
-	wgpunch "github.com/yago-123/wg-punch/pkg/connect"
-
+	"github.com/yago-123/wg-punch/pkg/connect"
 	"github.com/yago-123/wg-punch/pkg/puncher"
-
-	"github.com/yago-123/wg-punch/pkg/wg"
-
 	"github.com/yago-123/wg-punch/pkg/rendez/client"
-
+	"github.com/yago-123/wg-punch/pkg/wg"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
@@ -59,7 +55,7 @@ func main() {
 	rendezvous := client.NewRendezvous("http://rendezvous.yago.ninja:7777")
 
 	// Combine everything into the connector
-	conn := wgpunch.NewConnector("local-peer", puncher, tunnel, rendezvous, 1*time.Second)
+	conn := connect.NewConnector("peer-A", puncher, tunnel, rendezvous, 1*time.Second)
 
 	// todo(): think about where to put the cancel of the tunnel itself
 	defer tunnel.Close()
@@ -67,9 +63,9 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), ContextTimeout)
 
 	// Connect to peer using a shared peer ID (both sides use same ID)
-	netConn, err := conn.Connect(ctx, "peer-id-123", localPrivKey, localPubKey)
+	netConn, err := conn.Connect(ctx, "peer-B", localPrivKey, localPubKey)
 	if err != nil {
-		log.Fatalf("failed to connect to peer: %w", err)
+		log.Fatalf("failed to connect to peer: %v", err)
 	}
 
 	defer cancel()

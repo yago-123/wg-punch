@@ -7,13 +7,11 @@ import (
 	"time"
 
 	"github.com/yago-123/wg-punch/pkg/peer"
+	"github.com/yago-123/wg-punch/pkg/puncher"
+	"github.com/yago-123/wg-punch/pkg/rendez/client"
 	"github.com/yago-123/wg-punch/pkg/rendez/types"
 	"github.com/yago-123/wg-punch/pkg/util"
-
-	"github.com/yago-123/wg-punch/pkg/puncher"
 	"github.com/yago-123/wg-punch/pkg/wg"
-
-	"github.com/yago-123/wg-punch/pkg/rendez/client"
 )
 
 type Connector struct {
@@ -66,7 +64,7 @@ func (c *Connector) Connect(ctx context.Context, remotePeerID, localPrivKey, loc
 
 	// Create UDP connection on local public IP
 	// todo() : make localAddr configurable
-	conn, err := c.puncher.Punch(ctx, "0.0.0.0", endpoint)
+	conn, err := c.puncher.Punch(ctx, "0.0.0.0:0", endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to punch: %w", err)
 	}

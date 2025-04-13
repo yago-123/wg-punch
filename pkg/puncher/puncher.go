@@ -2,6 +2,7 @@ package puncher
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"time"
 
@@ -28,29 +29,37 @@ func NewPuncher(stunServers []string) Puncher {
 }
 
 func (p *puncher) Punch(ctx context.Context, localAddr string, remoteHint *net.UDPAddr) (*net.UDPConn, error) {
+	// If remoteHint is nil, return an error
+	if remoteHint == nil {
+		return nil, fmt.Errorf("remote hint required for punching")
+	}
+
+	// Parse local address
+	laddr, err := net.ResolveUDPAddr("udp", localAddr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid local address: %w", err)
+	}
+
 	// Listen for UDP packets on the local address
-	conn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP(localAddr)})
+	conn, err := net.ListenUDP("udp", laddr)
 	if err != nil {
 		return nil, err
 	}
 
-	// Perform the punch
-	if remoteHint != nil {
-		// Try sending empty UDP packets to open NAT mappings
-		go func() {
-			ticker := time.NewTicker(IntervalUDPPackets)
-			defer ticker.Stop()
+	// Try sending empty UDP packets to open NAT mappings
+	go func() {
+		ticker := time.NewTicker(IntervalUDPPackets)
+		defer ticker.Stop()
 
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
-					_, _ = conn.WriteToUDP([]byte("punch"), remoteHint)
-				}
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				_, _ = conn.WriteToUDP([]byte("punch"), remoteHint)
 			}
-		}()
-	}
+		}
+	}()
 
 	return conn, nil
 }

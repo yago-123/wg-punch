@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"log"
+	"net"
 	"time"
 
 	"github.com/yago-123/wg-punch/pkg/connect"
@@ -16,9 +17,9 @@ import (
 const (
 	ContextTimeout = 30 * time.Second
 
-	WireGuardListenPort        = 51820
-	WireGuardInterfaceName     = "wg0"
-	WireGuardKeepAliveInterval = 25 * time.Second
+	WireGuardListenPort        = 51822
+	WireGuardInterfaceName     = "wg2"
+	WireGuardKeepAliveInterval = 5 * time.Second
 )
 
 func main() {
@@ -45,9 +46,10 @@ func main() {
 	// WireGuard interface using WireGuard
 	tunnel := wg.NewTunnel(&wg.TunnelConfig{
 		PrivateKey:        localPrivKey,
-		Interface:         WireGuardInterfaceName,
+		Iface:             WireGuardInterfaceName,
 		ListenPort:        WireGuardListenPort,
 		ReplacePeer:       true,
+		CreateIface:       true,
 		KeepAliveInterval: WireGuardKeepAliveInterval,
 	})
 
@@ -62,14 +64,19 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), ContextTimeout)
 
+	localAddr := &net.UDPAddr{IP: net.IPv4zero, Port: WireGuardListenPort}
 	// Connect to peer using a shared peer ID (both sides use same ID)
-	netConn, err := conn.Connect(ctx, "peer-A", localPrivKey, localPubKey)
+	netConn, err := conn.Connect(ctx, localAddr, "peer-A", localPrivKey, localPubKey)
 	if err != nil {
 		log.Fatalf("failed to connect to peer: %v", err)
 	}
 
 	defer cancel()
 	defer netConn.Close()
+
+	if errDeadline := netConn.SetReadDeadline(time.Now().Add(ContextTimeout)); errDeadline != nil {
+		log.Fatalf("failed to set read deadline: %v", errDeadline)
+	}
 
 	// Secure connection established! Use like any net.Conn
 	var buf [1024]byte

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"log"
+	"net"
 	"time"
 
 	"github.com/yago-123/wg-punch/pkg/connect"
@@ -16,9 +17,9 @@ import (
 const (
 	ContextTimeout = 30 * time.Second
 
-	WireGuardListenPort        = 51820
-	WireGuardInterfaceName     = "wg0"
-	WireGuardKeepAliveInterval = 25 * time.Second
+	WireGuardListenPort        = 51821
+	WireGuardInterfaceName     = "wg1"
+	WireGuardKeepAliveInterval = 5 * time.Second
 )
 
 func main() {
@@ -45,9 +46,10 @@ func main() {
 	// WireGuard interface using WireGuard
 	tunnel := wg.NewTunnel(&wg.TunnelConfig{
 		PrivateKey:        localPrivKey,
-		Interface:         WireGuardInterfaceName,
+		Iface:             WireGuardInterfaceName,
 		ListenPort:        WireGuardListenPort,
 		ReplacePeer:       true,
+		CreateIface:       true,
 		KeepAliveInterval: WireGuardKeepAliveInterval,
 	})
 
@@ -63,7 +65,8 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), ContextTimeout)
 
 	// Connect to peer using a shared peer ID (both sides use same ID)
-	netConn, err := conn.Connect(ctx, "peer-B", localPrivKey, localPubKey)
+	localAddr := &net.UDPAddr{IP: net.IPv4zero, Port: WireGuardListenPort}
+	netConn, err := conn.Connect(ctx, localAddr, "peer-B", localPrivKey, localPubKey)
 	if err != nil {
 		log.Fatalf("failed to connect to peer: %v", err)
 	}
@@ -74,7 +77,7 @@ func main() {
 	// Secure connection established! Use like any net.Conn
 	_, err = netConn.Write([]byte("Hello from NAT punched WireGuard tunnel!\n"))
 	if err != nil {
-		log.Println("error writing:", err)
+		log.Fatalf("error writing to UDP connection: %v", err)
 	}
 
 	// todo(): wrap netConn in gRPC

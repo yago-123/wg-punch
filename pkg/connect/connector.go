@@ -3,6 +3,7 @@ package connect
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
 	"time"
 
@@ -12,6 +13,11 @@ import (
 	"github.com/yago-123/wg-punch/pkg/rendez/types"
 	"github.com/yago-123/wg-punch/pkg/util"
 	"github.com/yago-123/wg-punch/pkg/wg"
+)
+
+const (
+	// todo(): make this configurable
+	AllowedIPs = "10.0.0.42/32"
 )
 
 type Connector struct {
@@ -32,7 +38,7 @@ func NewConnector(localPeerID string, p puncher.Puncher, tunnel wg.Tunnel, rende
 	}
 }
 
-func (c *Connector) Connect(ctx context.Context, remotePeerID, localPrivKey, localPubKey string) (net.Conn, error) {
+func (c *Connector) Connect(ctx context.Context, localAddr *net.UDPAddr, remotePeerID, localPrivKey, localPubKey string) (net.Conn, error) {
 	// Discover own public address via STUN
 	publicAddr, err := c.puncher.PublicAddr(ctx)
 	if err != nil {
@@ -45,10 +51,12 @@ func (c *Connector) Connect(ctx context.Context, remotePeerID, localPrivKey, loc
 		PublicKey: localPubKey,
 		Endpoint:  publicAddr.String(),
 		// todo(): adjust AllowedIPs to needs and via argument or config
-		AllowedIPs: []string{"10.0.0.42/32"},
+		AllowedIPs: []string{AllowedIPs},
 	}); errRendez != nil {
 		return nil, fmt.Errorf("failed to register with rendezvous server: %w", errRendez)
 	}
+
+	log.Printf("Registered local peer %s with public address %s and allowed IPs %s", c.localPeerID, publicAddr.String(), AllowedIPs)
 
 	// Wait for peer info from the rendezvous server
 	peerInfo, endpoint, err := c.rendezClient.WaitForPeer(ctx, remotePeerID, c.waitInterval)
@@ -63,8 +71,8 @@ func (c *Connector) Connect(ctx context.Context, remotePeerID, localPrivKey, loc
 	}
 
 	// Create UDP connection on local public IP
-	// todo() : make localAddr configurable
-	conn, err := c.puncher.Punch(ctx, "0.0.0.0:0", endpoint)
+	// todo() : adjust localAddr to be passed in a more clean way
+	conn, err := c.puncher.Punch(ctx, localAddr, endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to punch: %w", err)
 	}

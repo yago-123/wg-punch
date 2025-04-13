@@ -2,6 +2,7 @@ package wg
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"strings"
 	"time"
@@ -50,6 +51,7 @@ func (wgt *wgTunnel) Start(conn *net.UDPConn, localPrivKey string, peer peer.Inf
 	}
 	defer client.Close()
 
+	// todo(): move to native wgctrl key type
 	privKey, err := wgtypes.ParseKey(localPrivKey)
 	if err != nil {
 		return fmt.Errorf("invalid private key: %w", err)
@@ -59,6 +61,9 @@ func (wgt *wgTunnel) Start(conn *net.UDPConn, localPrivKey string, peer peer.Inf
 	if err != nil {
 		return fmt.Errorf("invalid remote public key: %w", err)
 	}
+
+	// todo() remove
+	log.Printf("Endpoint being used by WG: %s", peer.Endpoint.String())
 
 	cfg := wgtypes.Config{
 		PrivateKey:   &privKey,
@@ -74,6 +79,8 @@ func (wgt *wgTunnel) Start(conn *net.UDPConn, localPrivKey string, peer peer.Inf
 		},
 	}
 
+	log.Printf("Starting WireGuard tunnel on interface %q to endpoint %s", wgt.config.Iface, peer.Endpoint)
+
 	if err = wgt.ensureInterfaceExists(wgt.config.Iface); err != nil {
 		return fmt.Errorf("failed to ensure interface exists: %w", err)
 	}
@@ -82,8 +89,7 @@ func (wgt *wgTunnel) Start(conn *net.UDPConn, localPrivKey string, peer peer.Inf
 		return fmt.Errorf("failed to configure device: %w", errDevice)
 	}
 
-	// todo(): pass wgctrl client to wait for Handshake
-	if errHandshake := wgt.waitForHandshake(client, remotePubKey, time.Second*10); errHandshake != nil {
+	if errHandshake := wgt.waitForHandshake(client, remotePubKey, 10*time.Second); errHandshake != nil {
 		return fmt.Errorf("failed to wait for handshake: %w", errHandshake)
 	}
 

@@ -3,6 +3,7 @@ package puncher
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
 	"time"
 
@@ -14,7 +15,7 @@ const (
 )
 
 type Puncher interface {
-	Punch(ctx context.Context, localAddr string, remoteHint *net.UDPAddr) (*net.UDPConn, error)
+	Punch(ctx context.Context, localAddr *net.UDPAddr, remoteHint *net.UDPAddr) (*net.UDPConn, error)
 	PublicAddr(ctx context.Context) (*net.UDPAddr, error)
 }
 
@@ -28,20 +29,17 @@ func NewPuncher(stunServers []string) Puncher {
 	}
 }
 
-func (p *puncher) Punch(ctx context.Context, localAddr string, remoteHint *net.UDPAddr) (*net.UDPConn, error) {
+func (p *puncher) Punch(ctx context.Context, localAddr *net.UDPAddr, remoteHint *net.UDPAddr) (*net.UDPConn, error) {
 	// If remoteHint is nil, return an error
 	if remoteHint == nil {
 		return nil, fmt.Errorf("remote hint required for punching")
 	}
 
-	// Parse local address
-	laddr, err := net.ResolveUDPAddr("udp", localAddr)
-	if err != nil {
-		return nil, fmt.Errorf("invalid local address: %w", err)
-	}
+	log.Printf("Punching remote peer %s", remoteHint)
+	log.Printf("Using local address %s", localAddr)
 
 	// Listen for UDP packets on the local address
-	conn, err := net.ListenUDP("udp", laddr)
+	conn, err := net.ListenUDP("udp", localAddr)
 	if err != nil {
 		return nil, err
 	}

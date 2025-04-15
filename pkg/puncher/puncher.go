@@ -35,6 +35,7 @@ func (p *puncher) Punch(ctx context.Context, localAddr *net.UDPAddr, remoteHint 
 		return nil, fmt.Errorf("remote hint required for punching")
 	}
 
+	// todo() remove
 	log.Printf("Punching remote peer %s", remoteHint)
 	log.Printf("Using local address %s", localAddr)
 

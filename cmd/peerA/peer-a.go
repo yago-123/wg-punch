@@ -43,21 +43,23 @@ func main() {
 	// STUN-based hole puncher
 	puncher := puncher.NewPuncher(stunServers)
 
-	// WireGuard interface using WireGuard
-	tunnel := wg.NewTunnel(&wg.TunnelConfig{
+	tunnelCfg := &wg.TunnelConfig{
 		PrivateKey:        localPrivKey,
 		Iface:             WireGuardInterfaceName,
 		ListenPort:        WireGuardListenPort,
 		ReplacePeer:       true,
 		CreateIface:       true,
 		KeepAliveInterval: WireGuardKeepAliveInterval,
-	})
+	}
+
+	// WireGuard interface using WireGuard
+	tunnel := wg.NewTunnel(tunnelCfg)
 
 	// Rendezvous server client (registers and discovers peer IPs)
 	rendezvous := client.NewRendezvous("http://rendezvous.yago.ninja:7777")
 
 	// Combine everything into the connector
-	conn := connect.NewConnector("peer-A", puncher, tunnel, rendezvous, 1*time.Second)
+	conn := connect.NewConnector("peer-101", puncher, tunnel, rendezvous, 1*time.Second)
 
 	// todo(): think about where to put the cancel of the tunnel itself
 	defer tunnel.Close()
@@ -65,8 +67,8 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), ContextTimeout)
 
 	// Connect to peer using a shared peer ID (both sides use same ID)
-	localAddr := &net.UDPAddr{IP: net.IPv4zero, Port: WireGuardListenPort}
-	netConn, err := conn.Connect(ctx, localAddr, "peer-B", localPrivKey, localPubKey)
+	localAddr := &net.UDPAddr{IP: net.IPv4zero, Port: tunnelCfg.ListenPort}
+	netConn, err := conn.Connect(ctx, localAddr, []string{"10.0.0.43/32"}, "peer-111", localPrivKey, localPubKey)
 	if err != nil {
 		log.Fatalf("failed to connect to peer: %v", err)
 	}

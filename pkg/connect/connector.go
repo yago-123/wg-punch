@@ -15,11 +15,6 @@ import (
 	"github.com/yago-123/wg-punch/pkg/wg"
 )
 
-const (
-	// todo(): make this configurable
-	AllowedIPs = "10.0.0.42/32"
-)
-
 type Connector struct {
 	localPeerID  string
 	puncher      puncher.Puncher
@@ -38,7 +33,7 @@ func NewConnector(localPeerID string, p puncher.Puncher, tunnel wg.Tunnel, rende
 	}
 }
 
-func (c *Connector) Connect(ctx context.Context, localAddr *net.UDPAddr, remotePeerID, localPrivKey, localPubKey string) (net.Conn, error) {
+func (c *Connector) Connect(ctx context.Context, localAddr *net.UDPAddr, allowedIPs []string, remotePeerID, localPrivKey, localPubKey string) (net.Conn, error) {
 	// Discover own public address via STUN
 	publicAddr, err := c.puncher.PublicAddr(ctx)
 	if err != nil {
@@ -47,16 +42,15 @@ func (c *Connector) Connect(ctx context.Context, localAddr *net.UDPAddr, remoteP
 
 	// Register local peer in rendezvous server
 	if errRendez := c.rendezClient.Register(ctx, types.RegisterRequest{
-		PeerID:    c.localPeerID,
-		PublicKey: localPubKey,
-		Endpoint:  publicAddr.String(),
-		// todo(): adjust AllowedIPs to needs and via argument or config
-		AllowedIPs: []string{AllowedIPs},
+		PeerID:     c.localPeerID,
+		PublicKey:  localPubKey,
+		Endpoint:   publicAddr.String(),
+		AllowedIPs: allowedIPs,
 	}); errRendez != nil {
 		return nil, fmt.Errorf("failed to register with rendezvous server: %w", errRendez)
 	}
 
-	log.Printf("Registered local peer %s with public address %s and allowed IPs %s", c.localPeerID, publicAddr.String(), AllowedIPs)
+	log.Printf("Registered local peer %s with public address %s and allowed IPs %s", c.localPeerID, publicAddr.String(), allowedIPs)
 
 	// Wait for peer info from the rendezvous server
 	peerInfo, endpoint, err := c.rendezClient.WaitForPeer(ctx, remotePeerID, c.waitInterval)
@@ -65,7 +59,7 @@ func (c *Connector) Connect(ctx context.Context, localAddr *net.UDPAddr, remoteP
 	}
 
 	// Adjust allowedIPs from string to IP format
-	allowedIPs, err := util.ConvertAllowedIPs(peerInfo.AllowedIPs)
+	allowedIPsPeer, err := util.ConvertAllowedIPs(peerInfo.AllowedIPs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert allowed IPs: %w", err)
 	}
@@ -81,7 +75,7 @@ func (c *Connector) Connect(ctx context.Context, localAddr *net.UDPAddr, remoteP
 	if errTunnel := c.tunnel.Start(conn, localPrivKey, peer.Info{
 		PublicKey:  peerInfo.PublicKey,
 		Endpoint:   endpoint,
-		AllowedIPs: allowedIPs,
+		AllowedIPs: allowedIPsPeer,
 	}); errTunnel != nil {
 		return nil, fmt.Errorf("failed to start wireguard tunnel: %w", errTunnel)
 	}

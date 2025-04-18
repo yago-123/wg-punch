@@ -1,6 +1,7 @@
 package wg
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net"
@@ -20,13 +21,14 @@ const (
 )
 
 type Tunnel interface {
-	Start(conn *net.UDPConn, localPrivKey string, peer peer.Info) error
+	Start(ctx context.Context, conn *net.UDPConn, localPrivKey string, peer peer.Info) error
 	Close() error
 }
 
 type TunnelConfig struct {
 	PrivateKey        string
 	Iface             string
+	IfaceIPv4CIDR     string
 	ListenPort        int
 	ReplacePeer       bool
 	CreateIface       bool
@@ -44,7 +46,7 @@ func NewTunnel(cfg *TunnelConfig) Tunnel {
 	}
 }
 
-func (wgt *wgTunnel) Start(conn *net.UDPConn, localPrivKey string, peer peer.Info) error {
+func (wgt *wgTunnel) Start(ctx context.Context, conn *net.UDPConn, localPrivKey string, peer peer.Info) error {
 	client, err := wgctrl.New()
 	if err != nil {
 		return fmt.Errorf("failed to open wgctrl client: %w", err)
@@ -62,7 +64,8 @@ func (wgt *wgTunnel) Start(conn *net.UDPConn, localPrivKey string, peer peer.Inf
 		return fmt.Errorf("invalid remote public key: %w", err)
 	}
 
-	// todo() remove
+	// todo() adjust logging to avoid unnecessary info
+	log.Printf("Public key used by local peer: %s", peer.PublicKey)
 	log.Printf("Endpoint being used by WG: %s", peer.Endpoint.String())
 
 	cfg := wgtypes.Config{
@@ -85,11 +88,15 @@ func (wgt *wgTunnel) Start(conn *net.UDPConn, localPrivKey string, peer peer.Inf
 		return fmt.Errorf("failed to ensure interface exists: %w", err)
 	}
 
+	if err = wgt.assignAddressToIface(wgt.config.Iface, wgt.config.IfaceIPv4CIDR); err != nil {
+		return fmt.Errorf("failed to assign address to interface: %w", err)
+	}
+
 	if errDevice := client.ConfigureDevice(wgt.config.Iface, cfg); errDevice != nil {
 		return fmt.Errorf("failed to configure device: %w", errDevice)
 	}
 
-	if errHandshake := wgt.waitForHandshake(client, remotePubKey, 10*time.Second); errHandshake != nil {
+	if errHandshake := wgt.waitForHandshake(ctx, client, remotePubKey); errHandshake != nil {
 		return fmt.Errorf("failed to wait for handshake: %w", errHandshake)
 	}
 
@@ -132,10 +139,12 @@ func (wgt *wgTunnel) ensureInterfaceExists(iface string) error {
 		LinkType:  WireGuardLinkType,
 	}
 
+	// Create the WireGuard interface
 	if err = netlink.LinkAdd(link); err != nil {
 		return fmt.Errorf("failed to create WireGuard interface %q: %w", iface, err)
 	}
 
+	// Bring the interface up
 	if err = netlink.LinkSetUp(link); err != nil {
 		return fmt.Errorf("failed to bring up interface %q: %w", iface, err)
 	}
@@ -143,25 +152,61 @@ func (wgt *wgTunnel) ensureInterfaceExists(iface string) error {
 	return nil
 }
 
-func (wgt *wgTunnel) waitForHandshake(wgClient *wgctrl.Client, remotePubKey wgtypes.Key, timeout time.Duration) error {
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		device, errDevice := wgClient.Device(wgt.config.Iface)
-		if errDevice != nil {
-			return fmt.Errorf("failed to get device info: %w", errDevice)
-		}
-
-		for _, peer := range device.Peers {
-			if peer.PublicKey == remotePubKey {
-				if !peer.LastHandshakeTime.IsZero() {
-					return nil
-				}
-			}
-		}
-
-		// todo(): make configurable
-		time.Sleep(500 * time.Millisecond)
+// assignAddressToIface assigns the internal IP address to the WireGuard interface in CIDR notation in order to allow
+// communications between peers
+func (wgt *wgTunnel) assignAddressToIface(iface, addrCIDR string) error {
+	// Lookup interface link by name
+	link, err := netlink.LinkByName(iface)
+	if err != nil {
+		return fmt.Errorf("failed to get link %s: %w", iface, err)
 	}
 
-	return fmt.Errorf("timeout waiting for handshake with peer %s", remotePubKey)
+	// Parse address CIDR to assign to the interface
+	addr, err := netlink.ParseAddr(addrCIDR)
+	if err != nil {
+		return fmt.Errorf("failed to parse address %s: %w", addrCIDR, err)
+	}
+
+	// Assign address to the interface
+	if errAddr := netlink.AddrAdd(link, addr); errAddr != nil {
+		return fmt.Errorf("failed to assign address: %w", errAddr)
+	}
+
+	return nil
+}
+
+// waitForHandshake waits for the handshake with the remote peer to be established
+func (wgt *wgTunnel) waitForHandshake(ctx context.Context, wgClient *wgctrl.Client, remotePubKey wgtypes.Key) error {
+	// todo(): make ticker configurable
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("context cancelled or deadline exceeded while waiting for handshake with peer %s: %w", remotePubKey, ctx.Err())
+
+		case <-ticker.C:
+			// Check if the device exists
+			device, errDevice := wgClient.Device(wgt.config.Iface)
+			if errDevice != nil {
+				return fmt.Errorf("failed to get device info: %w", errDevice)
+			}
+
+			// Check if the peer is present in the device
+			if hasHandshake(device, remotePubKey) {
+				return nil
+			}
+		}
+	}
+}
+
+// hasHandshake checks if the peer has a handshake with the given public key
+func hasHandshake(device *wgtypes.Device, remotePubKey wgtypes.Key) bool {
+	for _, peer := range device.Peers {
+		if peer.PublicKey == remotePubKey && !peer.LastHandshakeTime.IsZero() {
+			return true
+		}
+	}
+	return false
 }

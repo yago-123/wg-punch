@@ -15,6 +15,7 @@ import (
 const RendezvousClientTimeout = 5 * time.Second
 
 type Rendezvous interface {
+	// todo(): configure a TTL for the registration
 	Register(ctx context.Context, req types.RegisterRequest) error
 	Discover(ctx context.Context, peerID string) (*types.PeerResponse, *net.UDPAddr, error)
 	WaitForPeer(ctx context.Context, peerID string, interval time.Duration) (*types.PeerResponse, *net.UDPAddr, error)

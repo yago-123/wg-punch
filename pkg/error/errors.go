@@ -1,1 +1,1 @@
-package error
+package errors

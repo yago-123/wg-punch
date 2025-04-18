@@ -111,9 +111,25 @@ func (wgt *wgTunnel) Close() error {
 	}
 	defer client.Close()
 
-	return client.ConfigureDevice(wgt.config.Iface, wgtypes.Config{
-		ReplacePeers: wgt.config.ReplacePeer, // Clears all peers
-	})
+	// Clear all peers first
+	if errConf := client.ConfigureDevice(wgt.config.Iface, wgtypes.Config{
+		ReplacePeers: true,
+		Peers:        []wgtypes.PeerConfig{},
+	}); errConf != nil {
+		return fmt.Errorf("failed to clear WireGuard config: %w", errConf)
+	}
+
+	// Then delete the interface
+	link, err := netlink.LinkByName(wgt.config.Iface)
+	if err != nil {
+		return fmt.Errorf("failed to get link %s: %w", wgt.config.Iface, err)
+	}
+
+	if errLink := netlink.LinkDel(link); errLink != nil {
+		return fmt.Errorf("failed to delete link %s: %w", wgt.config.Iface, errLink)
+	}
+
+	return nil
 }
 
 // ensureInterfaceExists checks if the WireGuard interface exists and creates it if not
@@ -165,6 +181,19 @@ func (wgt *wgTunnel) assignAddressToIface(iface, addrCIDR string) error {
 	addr, err := netlink.ParseAddr(addrCIDR)
 	if err != nil {
 		return fmt.Errorf("failed to parse address %s: %w", addrCIDR, err)
+	}
+
+	// todo(): move this into a separate function
+	// Check if the address already exists on the interface
+	existingAddrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
+	if err != nil {
+		return fmt.Errorf("failed to list addresses on %s: %w", iface, err)
+	}
+
+	for _, a := range existingAddrs {
+		if a.IP.Equal(addr.IP) && a.Mask.String() == addr.Mask.String() {
+			return nil // already exists, don't reassign
+		}
 	}
 
 	// Assign address to the interface

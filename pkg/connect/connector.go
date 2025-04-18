@@ -72,7 +72,7 @@ func (c *Connector) Connect(ctx context.Context, localAddr *net.UDPAddr, allowed
 	}
 
 	// Start WireGuard tunnel
-	if errTunnel := c.tunnel.Start(conn, localPrivKey, peer.Info{
+	if errTunnel := c.tunnel.Start(ctx, conn, localPrivKey, peer.Info{
 		PublicKey:  peerInfo.PublicKey,
 		Endpoint:   endpoint,
 		AllowedIPs: allowedIPsPeer,

@@ -17,12 +17,16 @@ import (
 const (
 	ContextTimeout = 30 * time.Second
 
-	WireGuardListenPort        = 51822
-	WireGuardInterfaceName     = "wg2"
+	WireGuardListenPort    = 51822
+	WireGuardInterfaceName = "wg2"
+	WireGuardIfaceAddrCIDR = "10.1.1.2/32"
+
 	WireGuardKeepAliveInterval = 5 * time.Second
 )
 
 func main() {
+	allowedIPs := []string{"10.1.1.1/32"}
+
 	// Generate WireGuard keypair
 	privKey, err := wgtypes.GeneratePrivateKey()
 	if err != nil {
@@ -46,6 +50,7 @@ func main() {
 	tunnelCfg := &wg.TunnelConfig{
 		PrivateKey:        localPrivKey,
 		Iface:             WireGuardInterfaceName,
+		IfaceIPv4CIDR:     WireGuardIfaceAddrCIDR,
 		ListenPort:        WireGuardListenPort,
 		ReplacePeer:       true,
 		CreateIface:       true,
@@ -59,7 +64,7 @@ func main() {
 	rendezvous := client.NewRendezvous("http://rendezvous.yago.ninja:7777")
 
 	// Combine everything into the connector
-	conn := connect.NewConnector("peer-11", puncher, tunnel, rendezvous, 1*time.Second)
+	conn := connect.NewConnector("peer-11111", puncher, tunnel, rendezvous, 1*time.Second)
 
 	// todo(): think about where to put the cancel of the tunnel itself
 	defer tunnel.Close()
@@ -68,16 +73,19 @@ func main() {
 
 	localAddr := &net.UDPAddr{IP: net.IPv4zero, Port: tunnelCfg.ListenPort}
 	// Connect to peer using a shared peer ID (both sides use same ID)
-	netConn, err := conn.Connect(ctx, localAddr, []string{"10.0.0.42/32"}, "peer-10", localPrivKey, localPubKey)
+	netConn, err := conn.Connect(ctx, localAddr, allowedIPs, "peer-10111", localPrivKey, localPubKey)
 	if err != nil {
-		log.Fatalf("failed to connect to peer: %v", err)
+		log.Printf("failed to connect to peer: %v", err)
+		return
 	}
 
 	defer cancel()
 	defer netConn.Close()
 
+	// todo(): do not reuse the timeout for the read deadline
 	if errDeadline := netConn.SetReadDeadline(time.Now().Add(ContextTimeout)); errDeadline != nil {
-		log.Fatalf("failed to set read deadline: %v", errDeadline)
+		log.Printf("failed to set read deadline: %v", errDeadline)
+		return
 	}
 
 	// Secure connection established! Use like any net.Conn
@@ -85,6 +93,7 @@ func main() {
 	_, err = netConn.Read(buf[:])
 	if err != nil {
 		log.Println("error reading:", err)
+		return
 	}
 
 	log.Printf("Read from remote peer: %s", string(buf[:]))

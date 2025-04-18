@@ -17,16 +17,21 @@ import (
 const (
 	ContextTimeout = 30 * time.Second
 
-	WireGuardListenPort        = 51821
-	WireGuardInterfaceName     = "wg1"
+	WireGuardListenPort    = 51821
+	WireGuardIfaceName     = "wg1"
+	WireGuardIfaceAddrCIDR = "10.1.1.1/32"
+
 	WireGuardKeepAliveInterval = 5 * time.Second
 )
 
 func main() {
+	allowedIPs := []string{"10.1.1.2/32"}
+
 	// Generate WireGuard keypair
 	privKey, err := wgtypes.GeneratePrivateKey()
 	if err != nil {
-		log.Fatalf("failed to generate private key: %v", err)
+		log.Printf("failed to generate private key: %v", err)
+		return
 	}
 	pubKey := privKey.PublicKey()
 
@@ -45,7 +50,8 @@ func main() {
 
 	tunnelCfg := &wg.TunnelConfig{
 		PrivateKey:        localPrivKey,
-		Iface:             WireGuardInterfaceName,
+		Iface:             WireGuardIfaceName,
+		IfaceIPv4CIDR:     WireGuardIfaceAddrCIDR,
 		ListenPort:        WireGuardListenPort,
 		ReplacePeer:       true,
 		CreateIface:       true,
@@ -59,18 +65,19 @@ func main() {
 	rendezvous := client.NewRendezvous("http://rendezvous.yago.ninja:7777")
 
 	// Combine everything into the connector
-	conn := connect.NewConnector("peer-101", puncher, tunnel, rendezvous, 1*time.Second)
+	conn := connect.NewConnector("peer-10111", puncher, tunnel, rendezvous, 1*time.Second)
 
 	// todo(): think about where to put the cancel of the tunnel itself
 	defer tunnel.Close()
 
 	ctx, cancel := context.WithTimeout(context.Background(), ContextTimeout)
 
-	// Connect to peer using a shared peer ID (both sides use same ID)
 	localAddr := &net.UDPAddr{IP: net.IPv4zero, Port: tunnelCfg.ListenPort}
-	netConn, err := conn.Connect(ctx, localAddr, []string{"10.0.0.43/32"}, "peer-111", localPrivKey, localPubKey)
+	// Connect to peer using a shared peer ID (both sides use same ID)
+	netConn, err := conn.Connect(ctx, localAddr, allowedIPs, "peer-11111", localPrivKey, localPubKey)
 	if err != nil {
-		log.Fatalf("failed to connect to peer: %v", err)
+		log.Printf("failed to connect to peer: %v", err)
+		return
 	}
 
 	defer cancel()
@@ -79,7 +86,8 @@ func main() {
 	// Secure connection established! Use like any net.Conn
 	_, err = netConn.Write([]byte("Hello from NAT punched WireGuard tunnel!\n"))
 	if err != nil {
-		log.Fatalf("error writing to UDP connection: %v", err)
+		log.Printf("error writing to UDP connection: %v", err)
+		return
 	}
 
 	// todo(): wrap netConn in gRPC

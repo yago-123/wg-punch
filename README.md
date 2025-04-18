@@ -6,15 +6,22 @@ import (
 	"context"
 	"encoding/base64"
 	"log"
+	"net"
 	"time"
-	"wg-punch/pkg/rendezvous/client"
 
+	"github.com/yago-123/wg-punch/pkg/connect"
+	"github.com/yago-123/wg-punch/pkg/puncher"
+	"github.com/yago-123/wg-punch/pkg/rendez/client"
+	"github.com/yago-123/wg-punch/pkg/wg"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
 const (
-	Timeout             = 30 * time.Second
-	WireGuardListenPort = 51820
+	ContextTimeout = 30 * time.Second
+
+	WireGuardListenPort        = 51821
+	WireGuardInterfaceName     = "wg1"
+	WireGuardKeepAliveInterval = 5 * time.Second
 )
 
 func main() {
@@ -26,8 +33,8 @@ func main() {
 	pubKey := privKey.PublicKey()
 
 	// Your local WireGuard keys
-	localPrivateKey := base64.StdEncoding.EncodeToString(privKey[:])
-	peerPublicKey := base64.StdEncoding.EncodeToString(pubKey[:])
+	localPrivKey := base64.StdEncoding.EncodeToString(privKey[:])
+	localPubKey := base64.StdEncoding.EncodeToString(pubKey[:])
 
 	// Example STUN server list (used to discover public IP/port)
 	var stunServers = []string{
@@ -36,27 +43,34 @@ func main() {
 	}
 
 	// STUN-based hole puncher
-	puncher := wgpunch.NewPuncher(stunServers)
+	puncher := puncher.NewPuncher(stunServers)
 
-	// WireGuard interface using wireguard-go in userspace
-	tunnel := wgpunch.NewTunnel(&wgpunch.TunnelConfig{
-		PrivateKey: localPrivateKey,
-		ListenPort: WireGuardListenPort,
-		Interface:  "wg0",
+	// WireGuard interface using WireGuard
+	tunnel := wg.NewTunnel(&wg.TunnelConfig{
+		PrivateKey:        localPrivKey,
+		Iface:             WireGuardInterfaceName,
+		ListenPort:        WireGuardListenPort,
+		ReplacePeer:       true,
+		CreateIface:       true,
+		KeepAliveInterval: WireGuardKeepAliveInterval,
 	})
 
 	// Rendezvous server client (registers and discovers peer IPs)
-	rendezvous := client.NewRendezvousClient("https://rendezvous.com")
+	rendezvous := client.NewRendezvous("http://rendezvous.yago.ninja:7777")
 
 	// Combine everything into the connector
-	conn := wgpunch.NewConnector(puncher, tunnel, rendezvous)
+	conn := connect.NewConnector("peer-A", puncher, tunnel, rendezvous, 1*time.Second)
 
-	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	// todo(): think about where to put the cancel of the tunnel itself
+	defer tunnel.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), ContextTimeout)
 
 	// Connect to peer using a shared peer ID (both sides use same ID)
-	netConn, err := conn.Connect(ctx, "peer-id-123", peerPublicKey)
+	localAddr := &net.UDPAddr{IP: net.IPv4zero, Port: WireGuardListenPort}
+	netConn, err := conn.Connect(ctx, localAddr, "peer-B", localPrivKey, localPubKey)
 	if err != nil {
-		log.Fatal("failed to connect to peer:", err)
+		log.Fatalf("failed to connect to peer: %v", err)
 	}
 
 	defer cancel()
@@ -65,9 +79,11 @@ func main() {
 	// Secure connection established! Use like any net.Conn
 	_, err = netConn.Write([]byte("Hello from NAT punched WireGuard tunnel!\n"))
 	if err != nil {
-		log.Println("error writing:", err)
+		log.Fatalf("error writing to UDP connection: %v", err)
 	}
 
 	// todo(): wrap netConn in gRPC
 }
 ```
+
+# Quickstart 

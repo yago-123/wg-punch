@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"time"
 
@@ -35,10 +34,6 @@ func (p *puncher) Punch(ctx context.Context, localAddr *net.UDPAddr, remoteHint 
 	if remoteHint == nil {
 		return nil, fmt.Errorf("remote hint required for punching")
 	}
-
-	// todo() remove
-	log.Printf("Punching remote peer %s", remoteHint)
-	log.Printf("Using local address %s", localAddr)
 
 	// Listen for UDP packets on the local address
 	conn, err := net.ListenUDP("udp", localAddr)

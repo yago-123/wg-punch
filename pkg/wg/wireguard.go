@@ -64,10 +64,6 @@ func (wgt *wgTunnel) Start(ctx context.Context, conn *net.UDPConn, localPrivKey 
 		return fmt.Errorf("invalid remote public key: %w", err)
 	}
 
-	// todo() adjust logging to avoid unnecessary info
-	log.Printf("Public key used by local peer: %s", peer.PublicKey)
-	log.Printf("Endpoint being used by WG: %s", peer.Endpoint.String())
-
 	cfg := wgtypes.Config{
 		PrivateKey:   &privKey,
 		ListenPort:   &wgt.config.ListenPort,
@@ -81,10 +77,6 @@ func (wgt *wgTunnel) Start(ctx context.Context, conn *net.UDPConn, localPrivKey 
 			},
 		},
 	}
-
-	// todo() remove
-	log.Printf("Starting WireGuard tunnel on interface %q to endpoint %s", wgt.config.Iface, peer.Endpoint)
-	log.Printf("Allowed IPs for peer %s: %s", peer.PublicKey, peer.AllowedIPs[0])
 
 	if err = wgt.ensureInterfaceExists(wgt.config.Iface); err != nil {
 		return fmt.Errorf("failed to ensure interface exists: %w", err)
@@ -267,11 +259,9 @@ func startHandshakeTriggerLoop(ctx context.Context, endpoint *net.UDPAddr, inter
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			log.Printf("Sending handshake to %s", endpoint.String())
-
 			conn, err := net.DialUDP("udp", nil, endpoint)
 			if err != nil {
-				log.Printf("Error dialing UDP: %v", err)
+				// log.Printf("Error dialing UDP: %v", err)
 				continue
 			}
 
@@ -279,7 +269,7 @@ func startHandshakeTriggerLoop(ctx context.Context, endpoint *net.UDPAddr, inter
 			conn.Close()
 
 			if err != nil {
-				log.Printf("Error sending handshake to %s: %v", endpoint.String(), err)
+				// log.Printf("Error sending handshake to %s: %v", endpoint.String(), err)
 			}
 		}
 	}

@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"github.com/sirupsen/logrus"
+	"io"
 	"net"
 	"os"
 	"os/signal"
@@ -15,10 +17,15 @@ import (
 
 const (
 	ContextTimeout = 30 * time.Second
+	TCPProtocol    = "tcp"
+	TCPMaxBuffer   = 1024
+	TCPServerPort  = 8080
+	TCPClientPort  = 8080
 
-	WGListenPort    = 51822
-	WGIfaceName     = "wg2"
-	WGIfaceAddrCIDR = "10.1.1.2/32"
+	WGLocalListenPort    = 51822
+	WGLocalIfaceName     = "wg2"
+	WGLocalIfaceAddr     = "10.1.1.2"
+	WGLocalIfaceAddrCIDR = "10.1.1.2/32"
 
 	WGPrivKey = "4EnHGpFp2eW+aRMK1VVWqUtorspluG5FP0/P+YnLCns="
 	// WGPubKey  = "h2iGtZoTXBl7hOF6vCt5bKemrBAEsjmqLHZuAUJi6is="
@@ -28,7 +35,8 @@ const (
 	WGRemoteListenPort    = 51821
 	WGRemotePubEndpointIP = "127.0.0.1"
 	WGRemotePubKey        = "HhvuS5kX7kuqhlwnvbX7UjdFrjABQFShZ1q9qRSX9xI="
-	WGRemotePeerCIDR      = "10.1.1.1/32"
+	WGRemoteIfaceAddr     = "10.1.1.1"
+	WGRemoteIfaceAddrCIDR = "10.1.1.1/32"
 )
 
 func main() {
@@ -46,15 +54,15 @@ func main() {
 	// Configure the tunnel
 	tunnelCfg := &wg.TunnelConfig{
 		PrivateKey:        WGPrivKey,
-		Iface:             WGIfaceName,
-		IfaceIPv4CIDR:     WGIfaceAddrCIDR,
-		ListenPort:        WGListenPort,
+		Iface:             WGLocalIfaceName,
+		IfaceIPv4CIDR:     WGLocalIfaceAddrCIDR,
+		ListenPort:        WGLocalListenPort,
 		ReplacePeer:       true,
 		CreateIface:       true,
 		KeepAliveInterval: WGKeepAliveInterval,
 	}
 
-	remoteIP, remoteIPCIDR, err := net.ParseCIDR(WGRemotePeerCIDR)
+	remoteIP, remoteIPCIDR, err := net.ParseCIDR(WGRemoteIfaceAddrCIDR)
 	if err != nil {
 		logger.Errorf("failed to parse CIDR: %v", err)
 		return
@@ -81,11 +89,76 @@ func main() {
 		logger.Errorf("failed to start tunnel: %v", errStart)
 		return
 	}
-
 	defer tunnel.Stop()
 
 	logger.Infof("Tunnel has been stablished! Press Ctrl+C to exit.")
 
+	// Start TCP server and client poller
+	go startTCPServer(logger)
+
+	time.Sleep(5 * time.Second)
+	go startTCPClient(logger)
+
 	// Block until Ctrl+C signal is received
 	<-sigCh
+}
+
+func startTCPServer(logger *logrus.Logger) {
+	serverAddr := fmt.Sprintf("%s:%d", WGLocalIfaceAddr, TCPServerPort)
+	ln, err := net.Listen(TCPProtocol, serverAddr)
+	if err != nil {
+		logger.Errorf("TCP server listen error: %v", err)
+		return
+	}
+	defer ln.Close()
+
+	logger.Infof("TCP server ready on %s", serverAddr)
+
+	for {
+		conn, errServer := ln.Accept()
+		if errServer != nil {
+			logger.Errorf("accept error: %v", errServer)
+			continue
+		}
+
+		go handleTCPConnection(conn, logger)
+	}
+}
+
+func handleTCPConnection(c net.Conn, logger *logrus.Logger) {
+	defer c.Close()
+	buf := make([]byte, TCPMaxBuffer)
+
+	for {
+		n, err := c.Read(buf)
+		if err != nil {
+			if err == io.EOF {
+				logger.Infof("connection closed by %s", c.RemoteAddr())
+			} else {
+				logger.Errorf("read error from %s: %v", c.RemoteAddr(), err)
+			}
+			return
+		}
+		logger.Infof("received msg from %s: %s", c.RemoteAddr().String(), string(buf[:n]))
+	}
+}
+
+func startTCPClient(logger *logrus.Logger) {
+	remoteServerAddr := fmt.Sprintf("%s:%d", WGRemoteIfaceAddr, TCPClientPort)
+	conn, err := net.Dial(TCPProtocol, remoteServerAddr)
+	if err != nil {
+		logger.Errorf("TCP dial error: %v", err)
+		return
+	}
+	defer conn.Close()
+
+	for {
+		_, err = conn.Write([]byte("hello via TCP over WireGuard"))
+		if err != nil {
+			logger.Errorf("write error: %v", err)
+			return
+		}
+
+		time.Sleep(5 * time.Second)
+	}
 }

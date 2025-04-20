@@ -59,6 +59,7 @@ func (c *Connector) Connect(ctx context.Context, localAddr *net.UDPAddr, allowed
 	}
 
 	// Adjust allowedIPs from string to IP format
+	log.Printf("Peer %s has public address %s and allowed IPs %s", peerInfo.PeerID, peerInfo.Endpoint, peerInfo.AllowedIPs)
 	allowedIPsPeer, err := util.ConvertAllowedIPs(peerInfo.AllowedIPs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert allowed IPs: %w", err)

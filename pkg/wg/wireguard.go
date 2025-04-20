@@ -82,8 +82,9 @@ func (wgt *wgTunnel) Start(ctx context.Context, conn *net.UDPConn, localPrivKey 
 		},
 	}
 
+	// todo() remove
 	log.Printf("Starting WireGuard tunnel on interface %q to endpoint %s", wgt.config.Iface, peer.Endpoint)
-	log.Printf("Allowed IPs for peer %s: %s", peer.PublicKey, peer.AllowedIPs)
+	log.Printf("Allowed IPs for peer %s: %s", peer.PublicKey, peer.AllowedIPs[0])
 
 	if err = wgt.ensureInterfaceExists(wgt.config.Iface); err != nil {
 		return fmt.Errorf("failed to ensure interface exists: %w", err)
@@ -95,9 +96,9 @@ func (wgt *wgTunnel) Start(ctx context.Context, conn *net.UDPConn, localPrivKey 
 
 	// todo(): this might need to be replaced with wireguard-go + netstack
 	// Close UDP connection so that WireGuard can take over
-	if errConnUDP := conn.Close(); errConnUDP != nil {
-		return fmt.Errorf("failed to close UDP connection: %w", errConnUDP)
-	}
+	// if errConnUDP := conn.Close(); errConnUDP != nil {
+	//	return fmt.Errorf("failed to close UDP connection: %w", errConnUDP)
+	//}
 
 	time.Sleep(200 * time.Millisecond)
 
@@ -116,7 +117,7 @@ func (wgt *wgTunnel) Start(ctx context.Context, conn *net.UDPConn, localPrivKey 
 
 	log.Printf("WireGuard tunnel established with peer %s", peer.PublicKey)
 
-	wgt.listener = conn
+	// wgt.listener = conn
 	return nil
 }
 

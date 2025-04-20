@@ -3,7 +3,6 @@ package wg
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 	"strings"
 	"time"
@@ -106,8 +105,6 @@ func (wgt *wgTunnel) Start(ctx context.Context, conn *net.UDPConn, localPrivKey 
 	if errHandshake := wgt.waitForHandshake(ctx, client, remotePubKey); errHandshake != nil {
 		return fmt.Errorf("failed to wait for handshake: %w", errHandshake)
 	}
-
-	log.Printf("WireGuard tunnel established with peer %s", peer.PublicKey)
 
 	// wgt.listener = conn
 	return nil

@@ -16,11 +16,12 @@ import (
 )
 
 const (
-	ContextTimeout = 30 * time.Second
-	TCPProtocol    = "tcp"
-	TCPMaxBuffer   = 1024
-	TCPServerPort  = 8080
-	TCPClientPort  = 8080
+	TunnelHandshakeTimeout = 30 * time.Second
+
+	TCPProtocol   = "tcp"
+	TCPMaxBuffer  = 1024
+	TCPServerPort = 8080
+	TCPClientPort = 8080
 
 	WGLocalListenPort    = 51821
 	WGLocalIfaceName     = "wg1"
@@ -48,7 +49,7 @@ func main() {
 	// Notify the channel on SIGINT or SIGTERM
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
-	ctx, cancel := context.WithTimeout(context.Background(), ContextTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), TunnelHandshakeTimeout)
 	defer cancel()
 
 	// Configure the tunnel

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"io"
 	"net"
 	"os"
@@ -11,16 +10,19 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/yago-123/wg-punch/pkg/peer"
 	"github.com/yago-123/wg-punch/pkg/wg"
 )
 
 const (
-	ContextTimeout = 30 * time.Second
-	TCPProtocol    = "tcp"
-	TCPMaxBuffer   = 1024
-	TCPServerPort  = 8080
-	TCPClientPort  = 8080
+	TunnelHandshakeTimeout = 30 * time.Second
+
+	TCPProtocol   = "tcp"
+	TCPMaxBuffer  = 1024
+	TCPServerPort = 8080
+	TCPClientPort = 8080
 
 	WGLocalListenPort    = 51822
 	WGLocalIfaceName     = "wg2"
@@ -48,7 +50,7 @@ func main() {
 	// Notify the channel on SIGINT or SIGTERM
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
-	ctx, cancel := context.WithTimeout(context.Background(), ContextTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), TunnelHandshakeTimeout)
 	defer cancel()
 
 	// Configure the tunnel
@@ -96,6 +98,7 @@ func main() {
 	// Start TCP server and client poller
 	go startTCPServer(logger)
 
+	// Start TCP client after a delay to ensure server is ready
 	time.Sleep(5 * time.Second)
 	go startTCPClient(logger)
 

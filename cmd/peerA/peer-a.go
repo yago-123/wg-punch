@@ -2,9 +2,10 @@ package main
 
 import (
 	"context"
-	"github.com/sirupsen/logrus"
 	"net"
 	"time"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/yago-123/wg-punch/pkg/connect"
 	"github.com/yago-123/wg-punch/pkg/puncher"
@@ -25,7 +26,7 @@ const (
 
 	WGPrivKey = "APSapiXBpAH1vTAh4EIvSYxhsE9O1YYVcZJngjvNbVs="
 	WGPubKey  = "AKeIblnKKC1H75w+qWuL7LsU8mRW08dManorFcHTGw0="
-	
+
 	WGKeepAliveInterval = 5 * time.Second
 )
 

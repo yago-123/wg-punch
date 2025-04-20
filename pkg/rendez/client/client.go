@@ -9,16 +9,16 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/yago-123/wg-punch/pkg/rendez/types"
+	"github.com/yago-123/wg-punch/pkg/rendez"
 )
 
 const RendezvousClientTimeout = 5 * time.Second
 
 type Rendezvous interface {
 	// todo(): configure a TTL for the registration
-	Register(ctx context.Context, req types.RegisterRequest) error
-	Discover(ctx context.Context, peerID string) (*types.PeerResponse, *net.UDPAddr, error)
-	WaitForPeer(ctx context.Context, peerID string, interval time.Duration) (*types.PeerResponse, *net.UDPAddr, error)
+	Register(ctx context.Context, req rendez.RegisterRequest) error
+	Discover(ctx context.Context, peerID string) (*rendez.PeerResponse, *net.UDPAddr, error)
+	WaitForPeer(ctx context.Context, peerID string, interval time.Duration) (*rendez.PeerResponse, *net.UDPAddr, error)
 }
 
 type Client struct {
@@ -34,7 +34,7 @@ func NewRendezvous(baseURL string) Rendezvous {
 }
 
 // Register registers a peer with the rendez server
-func (c *Client) Register(ctx context.Context, req types.RegisterRequest) error {
+func (c *Client) Register(ctx context.Context, req rendez.RegisterRequest) error {
 	body, err := json.Marshal(req)
 	if err != nil {
 		return fmt.Errorf("marshal register request: %w", err)
@@ -60,7 +60,7 @@ func (c *Client) Register(ctx context.Context, req types.RegisterRequest) error 
 }
 
 // Discover retrieves the peer information from the rendezvous server
-func (c *Client) Discover(ctx context.Context, peerID string) (*types.PeerResponse, *net.UDPAddr, error) {
+func (c *Client) Discover(ctx context.Context, peerID string) (*rendez.PeerResponse, *net.UDPAddr, error) {
 	url := fmt.Sprintf("%s/peer/%s", c.baseURL, peerID)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -78,7 +78,7 @@ func (c *Client) Discover(ctx context.Context, peerID string) (*types.PeerRespon
 		return nil, nil, fmt.Errorf("discover failed with status: %s", resp.Status)
 	}
 
-	var peerResp types.PeerResponse
+	var peerResp rendez.PeerResponse
 	if errJSON := json.NewDecoder(resp.Body).Decode(&peerResp); errJSON != nil {
 		return nil, nil, fmt.Errorf("decode response: %w", errJSON)
 	}
@@ -92,7 +92,7 @@ func (c *Client) Discover(ctx context.Context, peerID string) (*types.PeerRespon
 	return &peerResp, udpAddr, nil
 }
 
-func (c *Client) WaitForPeer(ctx context.Context, peerID string, interval time.Duration) (*types.PeerResponse, *net.UDPAddr, error) {
+func (c *Client) WaitForPeer(ctx context.Context, peerID string, interval time.Duration) (*rendez.PeerResponse, *net.UDPAddr, error) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -107,7 +107,7 @@ func (c *Client) WaitForPeer(ctx context.Context, peerID string, interval time.D
 				if errUDP != nil {
 					return nil, nil, fmt.Errorf("invalid endpoint in response: %w", err)
 				}
-				return &types.PeerResponse{
+				return &rendez.PeerResponse{
 					PublicKey:  res.PublicKey,
 					AllowedIPs: res.AllowedIPs,
 					Endpoint:   addr.String(),

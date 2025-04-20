@@ -6,10 +6,11 @@ import (
 	"net"
 	"time"
 
+	"github.com/yago-123/wg-punch/pkg/rendez"
+
 	"github.com/yago-123/wg-punch/pkg/peer"
 	"github.com/yago-123/wg-punch/pkg/puncher"
 	"github.com/yago-123/wg-punch/pkg/rendez/client"
-	"github.com/yago-123/wg-punch/pkg/rendez/types"
 	"github.com/yago-123/wg-punch/pkg/util"
 	"github.com/yago-123/wg-punch/pkg/wg"
 )
@@ -40,7 +41,7 @@ func (c *Connector) Connect(ctx context.Context, localAddr *net.UDPAddr, allowed
 	}
 
 	// Register local peer in rendezvous server
-	if errRendez := c.rendezClient.Register(ctx, types.RegisterRequest{
+	if errRendez := c.rendezClient.Register(ctx, rendez.RegisterRequest{
 		PeerID:     c.localPeerID,
 		PublicKey:  localPubKey,
 		Endpoint:   publicAddr.String(),

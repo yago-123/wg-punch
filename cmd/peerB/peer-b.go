@@ -2,10 +2,11 @@ package main
 
 import (
 	"context"
-	"github.com/sirupsen/logrus"
 	"log"
 	"net"
 	"time"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/yago-123/wg-punch/pkg/connect"
 	"github.com/yago-123/wg-punch/pkg/puncher"

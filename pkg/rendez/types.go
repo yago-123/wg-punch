@@ -1,4 +1,4 @@
-package types
+package rendez
 
 type RegisterRequest struct {
 	PeerID     string   `json:"peer_id" example:"peer1"`

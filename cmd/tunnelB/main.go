@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"time"
 
+	kernelwg "github.com/yago-123/wg-punch/pkg/wg/kernel"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/yago-123/wg-punch/pkg/peer"
@@ -85,7 +87,7 @@ func main() {
 		},
 	}
 
-	tunnel := wg.NewTunnel(tunnelCfg)
+	tunnel := kernelwg.NewTunnel(tunnelCfg)
 
 	if errStart := tunnel.Start(ctx, nil, tunnelCfg.PrivateKey, remotePeer); errStart != nil {
 		logger.Errorf("failed to start tunnel: %v", errStart)

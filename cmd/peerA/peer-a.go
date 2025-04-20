@@ -5,6 +5,8 @@ import (
 	"net"
 	"time"
 
+	kernelwg "github.com/yago-123/wg-punch/pkg/wg/kernel"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/yago-123/wg-punch/pkg/connect"
@@ -52,7 +54,7 @@ func main() {
 	}
 
 	// WireGuard interface using WireGuard
-	tunnel := wg.NewTunnel(tunnelCfg)
+	tunnel := kernelwg.NewTunnel(tunnelCfg)
 
 	// Rendezvous server client (registers and discovers peer IPs)
 	rendezvous := client.NewRendezvous(RendezvousServer)

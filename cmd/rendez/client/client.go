@@ -6,11 +6,11 @@ import (
 	"log"
 	"time"
 
+	"github.com/yago-123/wg-punch/pkg/rendez"
+
 	"github.com/yago-123/wg-punch/pkg/util"
 
 	rendClient "github.com/yago-123/wg-punch/pkg/rendez/client"
-	"github.com/yago-123/wg-punch/pkg/rendez/types"
-
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
@@ -44,7 +44,7 @@ func main() {
 		log.Fatalf("failed to get public endpoint: %v", err)
 	}
 
-	err = client.Register(ctx, types.RegisterRequest{
+	err = client.Register(ctx, rendez.RegisterRequest{
 		PeerID:     "peer-a",
 		PublicKey:  base64.StdEncoding.EncodeToString(pubKey[:]),
 		AllowedIPs: []string{"10.0.0.2/32"},

@@ -2,80 +2,78 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
 	"log"
 	"net"
 	"time"
+
+	kernelwg "github.com/yago-123/wg-punch/pkg/wg/kernel"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/yago-123/wg-punch/pkg/connect"
 	"github.com/yago-123/wg-punch/pkg/puncher"
 	"github.com/yago-123/wg-punch/pkg/rendez/client"
 	"github.com/yago-123/wg-punch/pkg/wg"
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
 const (
-	ContextTimeout = 30 * time.Second
+	ContextTimeout   = 30 * time.Second
+	RendezvousServer = "http://rendezvous.yago.ninja:7777"
 
-	WireGuardListenPort    = 51822
-	WireGuardInterfaceName = "wg2"
-	WireGuardIfaceAddrCIDR = "10.1.1.2/32"
+	LocalPeerID  = "peer1"
+	RemotePeerID = "peer2"
 
-	WireGuardKeepAliveInterval = 5 * time.Second
+	WGListenPort    = 51821
+	WGIfaceName     = "wg1"
+	WGIfaceAddrCIDR = "10.1.1.1/32"
+
+	WGPrivKey = "SEK/qGXalmKu3yPhkvZThcc8aQxordG5RkUz0/4jcFE="
+	WGPubKey  = "CZq8h1yJSHkbLHtguwr6im+V5TNRrrCjYj6Y+XOR6wI="
+
+	WGKeepAliveInterval = 5 * time.Second
 )
 
+var stunServers = []string{
+	"stun.l.google.com:19302",
+	"stun1.l.google.com:19302",
+}
+
 func main() {
-	allowedIPs := []string{"10.1.1.1/32"}
-
-	// Generate WireGuard keypair
-	privKey, err := wgtypes.GeneratePrivateKey()
-	if err != nil {
-		log.Fatalf("failed to generate private key: %v", err)
-	}
-	pubKey := privKey.PublicKey()
-
-	// Your local WireGuard keys
-	localPrivKey := base64.StdEncoding.EncodeToString(privKey[:])
-	localPubKey := base64.StdEncoding.EncodeToString(pubKey[:])
-
-	// Example STUN server list (used to discover public IP/port)
-	var stunServers = []string{
-		"stun.l.google.com:19302",
-		"stun1.l.google.com:19302",
-	}
+	logger := logrus.New()
 
 	// STUN-based hole puncher
 	puncher := puncher.NewPuncher(stunServers)
 
 	tunnelCfg := &wg.TunnelConfig{
-		PrivateKey:        localPrivKey,
-		Iface:             WireGuardInterfaceName,
-		IfaceIPv4CIDR:     WireGuardIfaceAddrCIDR,
-		ListenPort:        WireGuardListenPort,
+		PrivateKey:        WGPrivKey,
+		Iface:             WGIfaceName,
+		IfaceIPv4CIDR:     WGIfaceAddrCIDR,
+		ListenPort:        WGListenPort,
 		ReplacePeer:       true,
 		CreateIface:       true,
-		KeepAliveInterval: WireGuardKeepAliveInterval,
+		KeepAliveInterval: WGKeepAliveInterval,
 	}
 
 	// WireGuard interface using WireGuard
-	tunnel := wg.NewTunnel(tunnelCfg)
+	tunnel := kernelwg.NewTunnel(tunnelCfg)
 
 	// Rendezvous server client (registers and discovers peer IPs)
-	rendezvous := client.NewRendezvous("http://rendezvous.yago.ninja:7777")
+	rendezvous := client.NewRendezvous(RendezvousServer)
 
 	// Combine everything into the connector
-	conn := connect.NewConnector("peer-11111", puncher, tunnel, rendezvous, 1*time.Second)
+	conn := connect.NewConnector(LocalPeerID, puncher, tunnel, rendezvous, 1*time.Second)
 
 	// todo(): think about where to put the cancel of the tunnel itself
-	defer tunnel.Close()
+	defer tunnel.Stop()
 
 	ctx, cancel := context.WithTimeout(context.Background(), ContextTimeout)
 
 	localAddr := &net.UDPAddr{IP: net.IPv4zero, Port: tunnelCfg.ListenPort}
+
 	// Connect to peer using a shared peer ID (both sides use same ID)
-	netConn, err := conn.Connect(ctx, localAddr, allowedIPs, "peer-10111", localPrivKey, localPubKey)
+	netConn, err := conn.Connect(ctx, localAddr, []string{WGIfaceAddrCIDR}, RemotePeerID, WGPrivKey, WGPubKey)
 	if err != nil {
-		log.Printf("failed to connect to peer: %v", err)
+		logger.Errorf("failed to connect to peer: %v", err)
 		return
 	}
 

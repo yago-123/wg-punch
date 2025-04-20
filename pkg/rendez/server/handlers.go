@@ -4,11 +4,11 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/yago-123/wg-punch/pkg/peer"
-	"github.com/yago-123/wg-punch/pkg/rendez/store"
-	"github.com/yago-123/wg-punch/pkg/rendez/types"
+	"github.com/yago-123/wg-punch/pkg/rendez"
 
 	"github.com/gin-gonic/gin"
+	"github.com/yago-123/wg-punch/pkg/peer"
+	"github.com/yago-123/wg-punch/pkg/rendez/store"
 )
 
 type Handler struct {
@@ -31,7 +31,7 @@ func NewHandler(s store.Store) *Handler {
 // @Failure      500  {string}  string "failed to register peer"
 // @Router       /register [post]
 func (h *Handler) RegisterHandler(c *gin.Context) {
-	var req types.RegisterRequest
+	var req rendez.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.String(http.StatusBadRequest, "invalid request body")
 		return
@@ -87,7 +87,7 @@ func (h *Handler) LookupHandler(c *gin.Context) {
 		return
 	}
 
-	resp := types.PeerResponse{
+	resp := rendez.PeerResponse{
 		PeerID:     peerID,
 		PublicKey:  info.PublicKey,
 		Endpoint:   info.Endpoint.String(),

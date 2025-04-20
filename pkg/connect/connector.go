@@ -3,14 +3,14 @@ package connect
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 	"time"
+
+	"github.com/yago-123/wg-punch/pkg/rendez"
 
 	"github.com/yago-123/wg-punch/pkg/peer"
 	"github.com/yago-123/wg-punch/pkg/puncher"
 	"github.com/yago-123/wg-punch/pkg/rendez/client"
-	"github.com/yago-123/wg-punch/pkg/rendez/types"
 	"github.com/yago-123/wg-punch/pkg/util"
 	"github.com/yago-123/wg-punch/pkg/wg"
 )
@@ -41,7 +41,7 @@ func (c *Connector) Connect(ctx context.Context, localAddr *net.UDPAddr, allowed
 	}
 
 	// Register local peer in rendezvous server
-	if errRendez := c.rendezClient.Register(ctx, types.RegisterRequest{
+	if errRendez := c.rendezClient.Register(ctx, rendez.RegisterRequest{
 		PeerID:     c.localPeerID,
 		PublicKey:  localPubKey,
 		Endpoint:   publicAddr.String(),
@@ -49,8 +49,6 @@ func (c *Connector) Connect(ctx context.Context, localAddr *net.UDPAddr, allowed
 	}); errRendez != nil {
 		return nil, fmt.Errorf("failed to register with rendezvous server: %w", errRendez)
 	}
-
-	log.Printf("Registered local peer %s with public address %s and allowed IPs %s", c.localPeerID, publicAddr.String(), allowedIPs)
 
 	// Wait for peer info from the rendezvous server
 	peerInfo, endpoint, err := c.rendezClient.WaitForPeer(ctx, remotePeerID, c.waitInterval)

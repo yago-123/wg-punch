@@ -83,6 +83,7 @@ func (wgt *wgTunnel) Start(ctx context.Context, conn *net.UDPConn, localPrivKey 
 	}
 
 	log.Printf("Starting WireGuard tunnel on interface %q to endpoint %s", wgt.config.Iface, peer.Endpoint)
+	log.Printf("Allowed IPs for peer %s: %s", peer.PublicKey, peer.AllowedIPs)
 
 	if err = wgt.ensureInterfaceExists(wgt.config.Iface); err != nil {
 		return fmt.Errorf("failed to ensure interface exists: %w", err)
@@ -92,13 +93,28 @@ func (wgt *wgTunnel) Start(ctx context.Context, conn *net.UDPConn, localPrivKey 
 		return fmt.Errorf("failed to assign address to interface: %w", err)
 	}
 
+	// todo(): this might need to be replaced with wireguard-go + netstack
+	// Close UDP connection so that WireGuard can take over
+	if errConnUDP := conn.Close(); errConnUDP != nil {
+		return fmt.Errorf("failed to close UDP connection: %w", errConnUDP)
+	}
+
+	time.Sleep(200 * time.Millisecond)
+
 	if errDevice := client.ConfigureDevice(wgt.config.Iface, cfg); errDevice != nil {
 		return fmt.Errorf("failed to configure device: %w", errDevice)
 	}
 
+	ctxInit, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+
+	go startHandshakeTriggerLoop(ctxInit, peer.Endpoint, 1*time.Second)
+
 	if errHandshake := wgt.waitForHandshake(ctx, client, remotePubKey); errHandshake != nil {
 		return fmt.Errorf("failed to wait for handshake: %w", errHandshake)
 	}
+
+	log.Printf("WireGuard tunnel established with peer %s", peer.PublicKey)
 
 	wgt.listener = conn
 	return nil
@@ -238,4 +254,32 @@ func hasHandshake(device *wgtypes.Device, remotePubKey wgtypes.Key) bool {
 		}
 	}
 	return false
+}
+
+// todo(): remove
+func startHandshakeTriggerLoop(ctx context.Context, endpoint *net.UDPAddr, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			log.Printf("Sending handshake to %s", endpoint.String())
+
+			conn, err := net.DialUDP("udp", nil, endpoint)
+			if err != nil {
+				log.Printf("Error dialing UDP: %v", err)
+				continue
+			}
+
+			_, err = conn.Write([]byte("hello wg"))
+			conn.Close()
+
+			if err != nil {
+				log.Printf("Error sending handshake to %s: %v", endpoint.String(), err)
+			}
+		}
+	}
 }

@@ -2,6 +2,7 @@ package puncher
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -55,7 +56,14 @@ func (p *puncher) Punch(ctx context.Context, localAddr *net.UDPAddr, remoteHint 
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				_, _ = conn.WriteToUDP([]byte("punch"), remoteHint)
+				_, errConn := conn.WriteToUDP([]byte("punch"), remoteHint)
+				// The connection will be closed right before the WireGuard tunnel is started
+				if errors.Is(errConn, net.ErrClosed) {
+					return
+				}
+
+				// if errConn != nil {
+				// todo(): handle
 			}
 		}
 	}()

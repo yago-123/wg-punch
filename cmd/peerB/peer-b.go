@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	ContextTimeout = 30 * time.Second
+	ContextTimeout = 1 * time.Hour
 
 	WireGuardListenPort    = 51822
 	WireGuardInterfaceName = "wg2"
@@ -64,7 +64,7 @@ func main() {
 	rendezvous := client.NewRendezvous("http://rendezvous.yago.ninja:7777")
 
 	// Combine everything into the connector
-	conn := connect.NewConnector("peer-11111", puncher, tunnel, rendezvous, 1*time.Second)
+	conn := connect.NewConnector("cd2", puncher, tunnel, rendezvous, 1*time.Second)
 
 	// todo(): think about where to put the cancel of the tunnel itself
 	defer tunnel.Close()
@@ -73,7 +73,7 @@ func main() {
 
 	localAddr := &net.UDPAddr{IP: net.IPv4zero, Port: tunnelCfg.ListenPort}
 	// Connect to peer using a shared peer ID (both sides use same ID)
-	netConn, err := conn.Connect(ctx, localAddr, allowedIPs, "peer-10111", localPrivKey, localPubKey)
+	netConn, err := conn.Connect(ctx, localAddr, allowedIPs, "cd1", localPrivKey, localPubKey)
 	if err != nil {
 		log.Printf("failed to connect to peer: %v", err)
 		return

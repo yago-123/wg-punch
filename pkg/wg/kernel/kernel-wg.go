@@ -18,18 +18,18 @@ const (
 	WireGuardLinkType = "wireguard"
 )
 
-type wgTunnel struct {
+type kernelWGTunnel struct {
 	config   *wg.TunnelConfig
 	listener *net.UDPConn
 }
 
 func NewTunnel(cfg *wg.TunnelConfig) wg.Tunnel {
-	return &wgTunnel{
+	return &kernelWGTunnel{
 		config: cfg,
 	}
 }
 
-func (wgt *wgTunnel) Start(ctx context.Context, conn *net.UDPConn, localPrivKey string, peer peer.Info) error {
+func (kwgt *kernelWGTunnel) Start(ctx context.Context, conn *net.UDPConn, localPrivKey string, peer peer.Info) error {
 	client, err := wgctrl.New()
 	if err != nil {
 		return fmt.Errorf("failed to open wgctrl client: %w", err)
@@ -49,23 +49,23 @@ func (wgt *wgTunnel) Start(ctx context.Context, conn *net.UDPConn, localPrivKey 
 
 	cfg := wgtypes.Config{
 		PrivateKey:   &privKey,
-		ListenPort:   &wgt.config.ListenPort,
-		ReplacePeers: wgt.config.ReplacePeer,
+		ListenPort:   &kwgt.config.ListenPort,
+		ReplacePeers: kwgt.config.ReplacePeer,
 		Peers: []wgtypes.PeerConfig{
 			{
 				PublicKey:                   remotePubKey,
 				Endpoint:                    peer.Endpoint,
 				AllowedIPs:                  peer.AllowedIPs,
-				PersistentKeepaliveInterval: &wgt.config.KeepAliveInterval,
+				PersistentKeepaliveInterval: &kwgt.config.KeepAliveInterval,
 			},
 		},
 	}
 
-	if err = wgt.ensureInterfaceExists(wgt.config.Iface); err != nil {
+	if err = kwgt.ensureInterfaceExists(kwgt.config.Iface); err != nil {
 		return fmt.Errorf("failed to ensure interface exists: %w", err)
 	}
 
-	if err = wgt.assignAddressToIface(wgt.config.Iface, wgt.config.IfaceIPv4CIDR); err != nil {
+	if err = kwgt.assignAddressToIface(kwgt.config.Iface, kwgt.config.IfaceIPv4CIDR); err != nil {
 		return fmt.Errorf("failed to assign address to interface: %w", err)
 	}
 
@@ -77,7 +77,7 @@ func (wgt *wgTunnel) Start(ctx context.Context, conn *net.UDPConn, localPrivKey 
 
 	time.Sleep(200 * time.Millisecond)
 
-	if errDevice := client.ConfigureDevice(wgt.config.Iface, cfg); errDevice != nil {
+	if errDevice := client.ConfigureDevice(kwgt.config.Iface, cfg); errDevice != nil {
 		return fmt.Errorf("failed to configure device: %w", errDevice)
 	}
 
@@ -86,7 +86,7 @@ func (wgt *wgTunnel) Start(ctx context.Context, conn *net.UDPConn, localPrivKey 
 
 	go startHandshakeTriggerLoop(ctxInit, peer.Endpoint, 1*time.Second)
 
-	if errHandshake := wgt.waitForHandshake(ctx, client, remotePubKey); errHandshake != nil {
+	if errHandshake := kwgt.waitForHandshake(ctx, client, remotePubKey); errHandshake != nil {
 		return fmt.Errorf("failed to wait for handshake: %w", errHandshake)
 	}
 
@@ -94,7 +94,7 @@ func (wgt *wgTunnel) Start(ctx context.Context, conn *net.UDPConn, localPrivKey 
 	return nil
 }
 
-func (wgt *wgTunnel) Stop() error {
+func (kwgt *kernelWGTunnel) Stop() error {
 	client, err := wgctrl.New()
 	if err != nil {
 		return fmt.Errorf("failed to open wgctrl client: %w", err)
@@ -102,7 +102,7 @@ func (wgt *wgTunnel) Stop() error {
 	defer client.Close()
 
 	// Clear all peers first
-	if errConf := client.ConfigureDevice(wgt.config.Iface, wgtypes.Config{
+	if errConf := client.ConfigureDevice(kwgt.config.Iface, wgtypes.Config{
 		ReplacePeers: true,
 		Peers:        []wgtypes.PeerConfig{},
 	}); errConf != nil {
@@ -110,21 +110,21 @@ func (wgt *wgTunnel) Stop() error {
 	}
 
 	// Then delete the interface
-	link, err := netlink.LinkByName(wgt.config.Iface)
+	link, err := netlink.LinkByName(kwgt.config.Iface)
 	if err != nil {
-		return fmt.Errorf("failed to get link %s: %w", wgt.config.Iface, err)
+		return fmt.Errorf("failed to get link %s: %w", kwgt.config.Iface, err)
 	}
 
 	if errLink := netlink.LinkDel(link); errLink != nil {
-		return fmt.Errorf("failed to delete link %s: %w", wgt.config.Iface, errLink)
+		return fmt.Errorf("failed to delete link %s: %w", kwgt.config.Iface, errLink)
 	}
 
 	return nil
 }
 
 // ensureInterfaceExists checks if the WireGuard interface exists and creates it if not
-func (wgt *wgTunnel) ensureInterfaceExists(iface string) error {
-	if !wgt.config.CreateIface {
+func (kwgt *kernelWGTunnel) ensureInterfaceExists(iface string) error {
+	if !kwgt.config.CreateIface {
 		return nil
 	}
 
@@ -160,7 +160,7 @@ func (wgt *wgTunnel) ensureInterfaceExists(iface string) error {
 
 // assignAddressToIface assigns the internal IP address to the WireGuard interface in CIDR notation in order to allow
 // communications between peers
-func (wgt *wgTunnel) assignAddressToIface(iface, addrCIDR string) error {
+func (kwgt *kernelWGTunnel) assignAddressToIface(iface, addrCIDR string) error {
 	// Lookup interface link by name
 	link, err := netlink.LinkByName(iface)
 	if err != nil {
@@ -195,7 +195,7 @@ func (wgt *wgTunnel) assignAddressToIface(iface, addrCIDR string) error {
 }
 
 // waitForHandshake waits for the handshake with the remote peer to be established
-func (wgt *wgTunnel) waitForHandshake(ctx context.Context, wgClient *wgctrl.Client, remotePubKey wgtypes.Key) error {
+func (kwgt *kernelWGTunnel) waitForHandshake(ctx context.Context, wgClient *wgctrl.Client, remotePubKey wgtypes.Key) error {
 	// todo(): make ticker configurable
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
@@ -207,7 +207,7 @@ func (wgt *wgTunnel) waitForHandshake(ctx context.Context, wgClient *wgctrl.Clie
 
 		case <-ticker.C:
 			// Check if the device exists
-			device, errDevice := wgClient.Device(wgt.config.Iface)
+			device, errDevice := wgClient.Device(kwgt.config.Iface)
 			if errDevice != nil {
 				return fmt.Errorf("failed to get device info: %w", errDevice)
 			}

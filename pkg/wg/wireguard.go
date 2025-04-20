@@ -22,7 +22,7 @@ const (
 
 type Tunnel interface {
 	Start(ctx context.Context, conn *net.UDPConn, localPrivKey string, peer peer.Info) error
-	Close() error
+	Stop() error
 }
 
 type TunnelConfig struct {
@@ -95,8 +95,8 @@ func (wgt *wgTunnel) Start(ctx context.Context, conn *net.UDPConn, localPrivKey 
 	}
 
 	// todo(): this might need to be replaced with wireguard-go + netstack
-	// Close UDP connection so that WireGuard can take over
-	// if errConnUDP := conn.Close(); errConnUDP != nil {
+	// Stop UDP connection so that WireGuard can take over
+	// if errConnUDP := conn.Stop(); errConnUDP != nil {
 	//	return fmt.Errorf("failed to close UDP connection: %w", errConnUDP)
 	//}
 
@@ -121,7 +121,7 @@ func (wgt *wgTunnel) Start(ctx context.Context, conn *net.UDPConn, localPrivKey 
 	return nil
 }
 
-func (wgt *wgTunnel) Close() error {
+func (wgt *wgTunnel) Stop() error {
 	client, err := wgctrl.New()
 	if err != nil {
 		return fmt.Errorf("failed to open wgctrl client: %w", err)

@@ -25,8 +25,6 @@ const (
 )
 
 func main() {
-	allowedIPs := []string{"10.1.1.2/32"}
-
 	// Generate WireGuard keypair
 	privKey, err := wgtypes.GeneratePrivateKey()
 	if err != nil {
@@ -65,16 +63,16 @@ func main() {
 	rendezvous := client.NewRendezvous("http://rendezvous.yago.ninja:7777")
 
 	// Combine everything into the connector
-	conn := connect.NewConnector("cd1", puncher, tunnel, rendezvous, 1*time.Second)
+	conn := connect.NewConnector("p11", puncher, tunnel, rendezvous, 1*time.Second)
 
 	// todo(): think about where to put the cancel of the tunnel itself
-	defer tunnel.Close()
+	defer tunnel.Stop()
 
 	ctx, cancel := context.WithTimeout(context.Background(), ContextTimeout)
 
 	localAddr := &net.UDPAddr{IP: net.IPv4zero, Port: tunnelCfg.ListenPort}
 	// Connect to peer using a shared peer ID (both sides use same ID)
-	netConn, err := conn.Connect(ctx, localAddr, allowedIPs, "cd2", localPrivKey, localPubKey)
+	netConn, err := conn.Connect(ctx, localAddr, []string{WireGuardIfaceAddrCIDR}, "p22", localPrivKey, localPubKey)
 	if err != nil {
 		log.Printf("failed to connect to peer: %v", err)
 		return

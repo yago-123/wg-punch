@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
-	"log"
+	"github.com/sirupsen/logrus"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/yago-123/wg-punch/pkg/peer"
@@ -11,24 +14,32 @@ import (
 )
 
 const (
-	ContextTimeout = 1 * time.Hour
+	ContextTimeout = 30 * time.Second
 
-	WGListenPort    = 51820
-	WGIfaceName     = "wg0"
+	WGListenPort    = 51822
+	WGIfaceName     = "wg2"
 	WGIfaceAddrCIDR = "10.1.1.2/32"
 
-	WGPubKey  = "h2iGtZoTXBl7hOF6vCt5bKemrBAEsjmqLHZuAUJi6is="
 	WGPrivKey = "4EnHGpFp2eW+aRMK1VVWqUtorspluG5FP0/P+YnLCns="
+	// WGPubKey  = "h2iGtZoTXBl7hOF6vCt5bKemrBAEsjmqLHZuAUJi6is="
 
-	WGKeepAliveInterval = 5 * time.Second
+	WGKeepAliveInterval = 25 * time.Second
 
-	WGRemoteListenPort    = 51820
-	WGRemotePubEndpointIP = "192.168.18.201"
+	WGRemoteListenPort    = 51821
+	WGRemotePubEndpointIP = "127.0.0.1"
 	WGRemotePubKey        = "HhvuS5kX7kuqhlwnvbX7UjdFrjABQFShZ1q9qRSX9xI="
 	WGRemotePeerCIDR      = "10.1.1.1/32"
 )
 
 func main() {
+	logger := logrus.New()
+
+	// Create a channel to listen for signals
+	sigCh := make(chan os.Signal, 1)
+
+	// Notify the channel on SIGINT or SIGTERM
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
 	ctx, cancel := context.WithTimeout(context.Background(), ContextTimeout)
 	defer cancel()
 
@@ -45,11 +56,11 @@ func main() {
 
 	remoteIP, remoteIPCIDR, err := net.ParseCIDR(WGRemotePeerCIDR)
 	if err != nil {
-		log.Printf("failed to parse CIDR: %v", err)
+		logger.Errorf("failed to parse CIDR: %v", err)
 		return
 	}
 
-	// Create a peer
+	// Create the remote peer
 	remotePeer := peer.Info{
 		PublicKey: WGRemotePubKey,
 		Endpoint: &net.UDPAddr{
@@ -67,15 +78,14 @@ func main() {
 	tunnel := wg.NewTunnel(tunnelCfg)
 
 	if errStart := tunnel.Start(ctx, nil, tunnelCfg.PrivateKey, remotePeer); errStart != nil {
-		log.Printf("failed to start tunnel: %v", errStart)
+		logger.Errorf("failed to start tunnel: %v", errStart)
 		return
 	}
 
-	log.Println("Tunnel is up! Press Ctrl+C to exit.")
-	<-ctx.Done()
+	defer tunnel.Stop()
 
-	if errTun := tunnel.Close(); errTun != nil {
-		log.Printf("Error closing tunnel: %v", errTun)
-		return
-	}
+	logger.Infof("Tunnel has been stablished! Press Ctrl+C to exit.")
+
+	// Block until Ctrl+C signal is received
+	<-sigCh
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"time"
 
@@ -15,31 +16,39 @@ const (
 )
 
 type Puncher interface {
-	Punch(ctx context.Context, localAddr *net.UDPAddr, remoteHint *net.UDPAddr) (*net.UDPConn, error)
-	PublicAddr(ctx context.Context) (*net.UDPAddr, error)
+	Punch(ctx context.Context, conn *net.UDPConn, remoteHint *net.UDPAddr) (*net.UDPConn, error)
+	PublicAddr(ctx context.Context, conn *net.UDPConn) (*net.UDPAddr, error)
 }
 
 type puncher struct {
 	stunServers []string
 }
 
+// todo(): pass conn as argument here?
 func NewPuncher(stunServers []string) Puncher {
 	return &puncher{
 		stunServers: stunServers,
 	}
 }
 
-func (p *puncher) Punch(ctx context.Context, localAddr *net.UDPAddr, remoteHint *net.UDPAddr) (*net.UDPConn, error) {
+func (p *puncher) Punch(ctx context.Context, conn *net.UDPConn, remoteHint *net.UDPAddr) (*net.UDPConn, error) {
 	// If remoteHint is nil, return an error
 	if remoteHint == nil {
 		return nil, fmt.Errorf("remote hint required for punching")
 	}
 
-	// Listen for UDP packets on the local address
-	conn, err := net.ListenUDP("udp", localAddr)
-	if err != nil {
-		return nil, err
+	// todo(): adjust
+	if conn == nil {
+		return nil, fmt.Errorf("conn required for punching")
 	}
+
+	log.Printf("punching towards remote hint %s", remoteHint.String())
+
+	// Listen for UDP packets on the local address
+	// conn, err := net.ListenUDP("udp", localAddr)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	// Try sending empty UDP packets to open NAT mappings
 	go func() {
@@ -48,6 +57,7 @@ func (p *puncher) Punch(ctx context.Context, localAddr *net.UDPAddr, remoteHint 
 
 		for {
 			select {
+			// todo(): make sure this can be cancelled once the tunnel have handshaked
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
@@ -66,6 +76,6 @@ func (p *puncher) Punch(ctx context.Context, localAddr *net.UDPAddr, remoteHint 
 	return conn, nil
 }
 
-func (p *puncher) PublicAddr(ctx context.Context) (*net.UDPAddr, error) {
-	return util.GetPublicEndpoint(ctx, p.stunServers)
+func (p *puncher) PublicAddr(ctx context.Context, conn *net.UDPConn) (*net.UDPAddr, error) {
+	return util.GetPublicEndpoint(ctx, p.stunServers, conn)
 }

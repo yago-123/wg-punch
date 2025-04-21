@@ -3,6 +3,7 @@ package kernelwg
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
 	"strings"
 	"time"
@@ -32,7 +33,7 @@ func NewTunnel(cfg *wg.TunnelConfig) wg.Tunnel {
 func (kwgt *kernelWGTunnel) Start(ctx context.Context, conn *net.UDPConn, localPrivKey string, peer peer.Info) error {
 	client, err := wgctrl.New()
 	if err != nil {
-		return fmt.Errorf("failed to open wgctrl client: %w", err)
+		return fmt.Errorf("failed to open wgctrl rendclient: %w", err)
 	}
 	defer client.Close()
 
@@ -61,6 +62,8 @@ func (kwgt *kernelWGTunnel) Start(ctx context.Context, conn *net.UDPConn, localP
 		},
 	}
 
+	log.Printf("configuring WireGuard device %s with config: %+v", kwgt.config.Iface, cfg)
+
 	if err = kwgt.ensureInterfaceExists(kwgt.config.Iface); err != nil {
 		return fmt.Errorf("failed to ensure interface exists: %w", err)
 	}
@@ -69,11 +72,13 @@ func (kwgt *kernelWGTunnel) Start(ctx context.Context, conn *net.UDPConn, localP
 		return fmt.Errorf("failed to assign address to interface: %w", err)
 	}
 
-	// todo(): this might need to be replaced with wireguard-go + netstack
-	// Stop UDP connection so that WireGuard can take over
-	// if errConnUDP := conn.Stop(); errConnUDP != nil {
-	//	return fmt.Errorf("failed to close UDP connection: %w", errConnUDP)
-	//}
+	// todo(): this check should go away
+	if conn != nil {
+		// Stop UDP connection so that WireGuard can take over
+		if errConnUDP := conn.Close(); errConnUDP != nil {
+			return fmt.Errorf("failed to close UDP connection: %w", errConnUDP)
+		}
+	}
 
 	time.Sleep(200 * time.Millisecond)
 
@@ -90,14 +95,14 @@ func (kwgt *kernelWGTunnel) Start(ctx context.Context, conn *net.UDPConn, localP
 		return fmt.Errorf("failed to wait for handshake: %w", errHandshake)
 	}
 
-	// wgt.listener = conn
+	kwgt.listener = conn
 	return nil
 }
 
 func (kwgt *kernelWGTunnel) Stop() error {
 	client, err := wgctrl.New()
 	if err != nil {
-		return fmt.Errorf("failed to open wgctrl client: %w", err)
+		return fmt.Errorf("failed to open wgctrl rendclient: %w", err)
 	}
 	defer client.Close()
 

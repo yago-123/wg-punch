@@ -36,7 +36,7 @@ const (
 	WGKeepAliveInterval = 25 * time.Second
 
 	WGRemoteListenPort    = 51822
-	WGRemotePubEndpointIP = "127.0.0.1"
+	WGRemotePubEndpointIP = "192.168.18.202"
 	WGRemotePubKey        = "h2iGtZoTXBl7hOF6vCt5bKemrBAEsjmqLHZuAUJi6is="
 	WGRemoteIfaceAddr     = "10.1.1.2"
 	WGRemoteIfaceAddrCIDR = "10.1.1.2/32"

@@ -24,13 +24,14 @@ func ConvertAllowedIPs(allowedIPs []string) ([]net.IPNet, error) {
 	return result, nil
 }
 
-// GetPublicEndpoint tries the provided STUN servers to discover the public-facing IP.
-// Returns the endpoint as "IP:port", or an error if all servers fail.
-func GetPublicEndpoint(ctx context.Context, servers []string) (*net.UDPAddr, error) {
+// GetPublicEndpoint attempts to discover the public-facing UDP address of the local machine by querying a list of STUN
+// servers. It sends a STUN Binding Request through the provided UDP connection and returns the first successful
+// response.
+func GetPublicEndpoint(ctx context.Context, servers []string, conn *net.UDPConn) (*net.UDPAddr, error) {
 	var lastErr error
 
 	for _, server := range servers {
-		endpoint, err := trySTUNServer(ctx, server)
+		endpoint, err := trySTUNServer(ctx, server, conn)
 		if err == nil {
 			return endpoint, nil
 		}
@@ -41,16 +42,7 @@ func GetPublicEndpoint(ctx context.Context, servers []string) (*net.UDPAddr, err
 	return nil, fmt.Errorf("all STUN servers failed: %w", lastErr)
 }
 
-func trySTUNServer(ctx context.Context, server string) (*net.UDPAddr, error) {
-	var err error
-
-	dialer := &net.Dialer{}
-	conn, err := dialer.DialContext(ctx, "udp", server)
-	if err != nil {
-		return nil, fmt.Errorf("error dialing STUN server %s: %w", server, err)
-	}
-	defer conn.Close()
-
+func trySTUNServer(ctx context.Context, server string, conn *net.UDPConn) (*net.UDPAddr, error) {
 	client, err := stun.NewClient(conn)
 	if err != nil {
 		return nil, fmt.Errorf("error creating STUN client: %w", err)
@@ -76,7 +68,6 @@ func trySTUNServer(ctx context.Context, server string) (*net.UDPAddr, error) {
 				Port: xorAddr.Port,
 			}
 		})
-
 		if err != nil {
 			errCh <- fmt.Errorf("STUN request to %s failed: %w", server, err)
 		}

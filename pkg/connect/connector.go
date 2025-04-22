@@ -48,19 +48,20 @@ func (c *Connector) Connect(ctx context.Context, localAddr *net.UDPAddr, allowed
 	}
 
 	// Register local peer in rendezvous server
-	if errRendez := c.rendezClient.Register(ctx, rendez.RegisterRequest{
+	localPeerInfo := rendez.RegisterRequest{
 		PeerID:     c.localPeerID,
 		PublicKey:  localPubKey,
 		Endpoint:   publicAddr.String(),
 		AllowedIPs: allowedIPs,
-	}); errRendez != nil {
+	}
+	if errRendez := c.rendezClient.Register(ctx, localPeerInfo); errRendez != nil {
 		return nil, fmt.Errorf("failed to register with rendezvous server: %w", errRendez)
 	}
 
 	log.Printf("Registered local peer %s with rendezvous server. Pub endpoint %s and allowed IPs %s", c.localPeerID, publicAddr.String(), allowedIPs)
 
 	// Wait for peer info from the rendezvous server
-	peerInfo, endpoint, err := c.rendezClient.WaitForPeer(ctx, remotePeerID, c.waitInterval)
+	remotePeerInfo, endpoint, err := c.rendezClient.WaitForPeer(ctx, remotePeerID, c.waitInterval)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get peer info: %w", err)
 	}
@@ -73,16 +74,17 @@ func (c *Connector) Connect(ctx context.Context, localAddr *net.UDPAddr, allowed
 	}
 
 	// Adjust allowedIPs from string to IP format
-	allowedIPsPeer, err := util.ConvertAllowedIPs(peerInfo.AllowedIPs)
+	remoteAllowedIPs, err := util.ConvertAllowedIPs(remotePeerInfo.AllowedIPs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert allowed IPs: %w", err)
 	}
 
+	log.Printf("Connecting to remote peer %s with endpoint %s and allowed IPs %s", remotePeerID, endpoint.String(), remoteAllowedIPs)
 	// Start WireGuard tunnel
 	if errTunnel := c.tunnel.Start(ctx, conn, localPrivKey, peer.Info{
-		PublicKey:  peerInfo.PublicKey,
+		PublicKey:  remotePeerInfo.PublicKey,
 		Endpoint:   endpoint,
-		AllowedIPs: allowedIPsPeer,
+		AllowedIPs: remoteAllowedIPs,
 	}); errTunnel != nil {
 		return nil, fmt.Errorf("failed to start wireguard tunnel: %w", errTunnel)
 	}

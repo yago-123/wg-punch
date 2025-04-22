@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"strings"
 	"time"
 
@@ -70,6 +71,10 @@ func (kwgt *kernelWGTunnel) Start(ctx context.Context, conn *net.UDPConn, localP
 
 	if err = kwgt.assignAddressToIface(kwgt.config.Iface, kwgt.config.IfaceIPv4CIDR); err != nil {
 		return fmt.Errorf("failed to assign address to interface: %w", err)
+	}
+
+	if err = kwgt.addPeerRoutes(kwgt.config.Iface, peer.AllowedIPs); err != nil {
+		return fmt.Errorf("failed to add peer routes: %w", err)
 	}
 
 	// todo(): this check should go away
@@ -194,6 +199,28 @@ func (kwgt *kernelWGTunnel) assignAddressToIface(iface, addrCIDR string) error {
 	// Assign address to the interface
 	if errAddr := netlink.AddrAdd(link, addr); errAddr != nil {
 		return fmt.Errorf("failed to assign address: %w", errAddr)
+	}
+
+	return nil
+}
+
+// addPeerRoutes adds the allowed IPs of the peer to the WireGuard interface so that the kernel can route packets
+func (kwgt *kernelWGTunnel) addPeerRoutes(iface string, allowedIPs []net.IPNet) error {
+	link, err := netlink.LinkByName(iface)
+	if err != nil {
+		return fmt.Errorf("failed to get link %q: %w", iface, err)
+	}
+
+	for _, ipNet := range allowedIPs {
+		route := &netlink.Route{
+			LinkIndex: link.Attrs().Index,
+			Dst:       &ipNet,
+		}
+
+		// Try to add the route, but don't fail if it already exists
+		if errRoute := netlink.RouteAdd(route); errRoute != nil && !os.IsExist(errRoute) {
+			return fmt.Errorf("failed to add route %s: %w", ipNet.String(), errRoute)
+		}
 	}
 
 	return nil

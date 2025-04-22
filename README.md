@@ -1,4 +1,5 @@
 # wg-punch
+![Alt text](https://github.com/user-attachments/assets/7225f4e0-e949-470a-b07f-a9c9a4a81530)
 
 ## Detecting NAT type
 ```bash

@@ -44,12 +44,6 @@ func (p *puncher) Punch(ctx context.Context, conn *net.UDPConn, remoteHint *net.
 
 	log.Printf("punching towards remote hint %s", remoteHint.String())
 
-	// Listen for UDP packets on the local address
-	// conn, err := net.ListenUDP("udp", localAddr)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
 	// Try sending empty UDP packets to open NAT mappings
 	go func() {
 		ticker := time.NewTicker(IntervalUDPPackets)
@@ -77,5 +71,5 @@ func (p *puncher) Punch(ctx context.Context, conn *net.UDPConn, remoteHint *net.
 }
 
 func (p *puncher) PublicAddr(ctx context.Context, conn *net.UDPConn) (*net.UDPAddr, error) {
-	return util.GetPublicEndpoint(ctx, p.stunServers, conn)
+	return util.GetPublicEndpoint(ctx, conn, p.stunServers)
 }

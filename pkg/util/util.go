@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/pion/stun"
 )
@@ -27,11 +28,11 @@ func ConvertAllowedIPs(allowedIPs []string) ([]net.IPNet, error) {
 // GetPublicEndpoint attempts to discover the public-facing UDP address of the local machine by querying a list of STUN
 // servers. It sends a STUN Binding Request through the provided UDP connection and returns the first successful
 // response.
-func GetPublicEndpoint(ctx context.Context, servers []string, conn *net.UDPConn) (*net.UDPAddr, error) {
+func GetPublicEndpoint(ctx context.Context, conn *net.UDPConn, servers []string) (*net.UDPAddr, error) {
 	var lastErr error
 
 	for _, server := range servers {
-		endpoint, err := trySTUNServer(ctx, server, conn)
+		endpoint, err := trySTUNServer(ctx, conn, server)
 		if err == nil {
 			return endpoint, nil
 		}
@@ -42,43 +43,48 @@ func GetPublicEndpoint(ctx context.Context, servers []string, conn *net.UDPConn)
 	return nil, fmt.Errorf("all STUN servers failed: %w", lastErr)
 }
 
-func trySTUNServer(ctx context.Context, server string, conn *net.UDPConn) (*net.UDPAddr, error) {
-	client, err := stun.NewClient(conn)
+// todo(): adjust hardcoded values
+func trySTUNServer(ctx context.Context, conn *net.UDPConn, server string) (*net.UDPAddr, error) {
+	serverAddr, err := net.ResolveUDPAddr("udp", server)
 	if err != nil {
-		return nil, fmt.Errorf("error creating STUN client: %w", err)
+		return nil, fmt.Errorf("failed to resolve STUN server %q: %w", server, err)
 	}
-	defer client.Close()
 
-	resultCh := make(chan *net.UDPAddr, 1)
-	errCh := make(chan error, 1)
+	// Build STUN Binding Request
+	req := stun.MustBuild(stun.TransactionID, stun.BindingRequest)
 
-	go func() {
-		var xorAddr stun.XORMappedAddress
-		err = client.Do(stun.MustBuild(stun.TransactionID, stun.BindingRequest), func(res stun.Event) {
-			if res.Error != nil {
-				errCh <- res.Error
-				return
-			}
-			if getErr := xorAddr.GetFrom(res.Message); getErr != nil {
-				errCh <- fmt.Errorf("failed to get XOR-MAPPED-ADDRESS: %w", getErr)
-				return
-			}
-			resultCh <- &net.UDPAddr{
-				IP:   xorAddr.IP,
-				Port: xorAddr.Port,
-			}
-		})
-		if err != nil {
-			errCh <- fmt.Errorf("STUN request to %s failed: %w", server, err)
-		}
-	}()
-
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case err = <-errCh:
-		return nil, err
-	case addr := <-resultCh:
-		return addr, nil
+	// Send request
+	if _, err := conn.WriteToUDP(req.Raw, serverAddr); err != nil {
+		return nil, fmt.Errorf("failed to send STUN request to %s: %w", server, err)
 	}
+
+	// Respect context deadline for read timeout
+	deadline, hasDeadline := ctx.Deadline()
+	if hasDeadline {
+		_ = conn.SetReadDeadline(deadline)
+	} else {
+		_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	}
+
+	buf := make([]byte, 1500)
+	n, _, err := conn.ReadFromUDP(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read STUN response from %s: %w", server, err)
+	}
+
+	var res stun.Message
+	res.Raw = buf[:n]
+	if err := res.Decode(); err != nil {
+		return nil, fmt.Errorf("failed to decode STUN response: %w", err)
+	}
+
+	var xorAddr stun.XORMappedAddress
+	if err := xorAddr.GetFrom(&res); err != nil {
+		return nil, fmt.Errorf("failed to extract XOR-MAPPED-ADDRESS: %w", err)
+	}
+
+	return &net.UDPAddr{
+		IP:   xorAddr.IP,
+		Port: xorAddr.Port,
+	}, nil
 }

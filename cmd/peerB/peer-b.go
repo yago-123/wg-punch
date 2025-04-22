@@ -2,8 +2,12 @@ package main
 
 import (
 	"context"
-	"log"
+	"fmt"
+	"io"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	kernelwg "github.com/yago-123/wg-punch/pkg/wg/kernel"
@@ -17,18 +21,24 @@ import (
 )
 
 const (
-	ContextTimeout   = 30 * time.Second
-	RendezvousServer = "http://rendezvous.yago.ninja:7777"
+	TCPProtocol   = "tcp"
+	TCPServerPort = 8080
+	TCPClientPort = 8080
+	TCPMaxBuffer  = 1024
 
-	LocalPeerID  = "peer1"
-	RemotePeerID = "peer2"
+	TunnelHandshakeTimeout = 30 * time.Minute
+	RendezvousServer       = "http://rendezvous.yago.ninja:7777"
 
-	WGListenPort    = 51821
-	WGIfaceName     = "wg1"
-	WGIfaceAddrCIDR = "10.1.1.1/32"
+	LocalPeerID  = "xx2"
+	RemotePeerID = "xx1"
 
-	WGPrivKey = "SEK/qGXalmKu3yPhkvZThcc8aQxordG5RkUz0/4jcFE="
-	WGPubKey  = "CZq8h1yJSHkbLHtguwr6im+V5TNRrrCjYj6Y+XOR6wI="
+	WGLocalListenPort    = 51822
+	WGLocalIfaceName     = "wg2"
+	WGLocalIfaceAddr     = "10.1.1.2"
+	WGLocalIfaceAddrCIDR = "10.1.1.2/32"
+
+	WGLocalPrivKey = "SEK/qGXalmKu3yPhkvZThcc8aQxordG5RkUz0/4jcFE="
+	WGLocalPubKey  = "CZq8h1yJSHkbLHtguwr6im+V5TNRrrCjYj6Y+XOR6wI="
 
 	WGKeepAliveInterval = 5 * time.Second
 )
@@ -41,14 +51,20 @@ var stunServers = []string{
 func main() {
 	logger := logrus.New()
 
+	// Create a channel to listen for signals
+	sigCh := make(chan os.Signal, 1)
+
+	// Notify the channel on SIGINT or SIGTERM
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
 	// STUN-based hole puncher
 	puncher := puncher.NewPuncher(stunServers)
 
 	tunnelCfg := &wg.TunnelConfig{
-		PrivateKey:        WGPrivKey,
-		Iface:             WGIfaceName,
-		IfaceIPv4CIDR:     WGIfaceAddrCIDR,
-		ListenPort:        WGListenPort,
+		PrivateKey:        WGLocalPrivKey,
+		Iface:             WGLocalIfaceName,
+		IfaceIPv4CIDR:     WGLocalIfaceAddrCIDR,
+		ListenPort:        WGLocalListenPort,
 		ReplacePeer:       true,
 		CreateIface:       true,
 		KeepAliveInterval: WGKeepAliveInterval,
@@ -57,7 +73,7 @@ func main() {
 	// WireGuard interface using WireGuard
 	tunnel := kernelwg.NewTunnel(tunnelCfg)
 
-	// Rendezvous server client (registers and discovers peer IPs)
+	// Rendezvous server (registers and discovers peer IPs)
 	rendezvous := client.NewRendezvous(RendezvousServer)
 
 	// Combine everything into the connector
@@ -66,12 +82,12 @@ func main() {
 	// todo(): think about where to put the cancel of the tunnel itself
 	defer tunnel.Stop()
 
-	ctx, cancel := context.WithTimeout(context.Background(), ContextTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), TunnelHandshakeTimeout)
 
 	localAddr := &net.UDPAddr{IP: net.IPv4zero, Port: tunnelCfg.ListenPort}
 
 	// Connect to peer using a shared peer ID (both sides use same ID)
-	netConn, err := conn.Connect(ctx, localAddr, []string{WGIfaceAddrCIDR}, RemotePeerID, WGPrivKey, WGPubKey)
+	netConn, err := conn.Connect(ctx, localAddr, []string{WGLocalIfaceAddrCIDR}, RemotePeerID, WGLocalPrivKey, WGLocalPubKey)
 	if err != nil {
 		logger.Errorf("failed to connect to peer: %v", err)
 		return
@@ -80,21 +96,76 @@ func main() {
 	defer cancel()
 	defer netConn.Close()
 
-	// todo(): do not reuse the timeout for the read deadline
-	if errDeadline := netConn.SetReadDeadline(time.Now().Add(ContextTimeout)); errDeadline != nil {
-		log.Printf("failed to set read deadline: %v", errDeadline)
-		return
-	}
+	logger.Printf("Tunnel has been stablished! Press Ctrl+C to exit.")
 
-	// Secure connection established! Use like any net.Conn
-	var buf [1024]byte
-	_, err = netConn.Read(buf[:])
+	// Start TCP server
+	go startTCPServer(logger)
+
+	// Start TCP client after a delay to ensure server is ready
+	time.Sleep(5 * time.Second)
+	// todo(): adjust the IP to the one assigned by the rendezvous server
+	go startTCPClient(logger, "10.1.1.1")
+
+	// Block until Ctrl+C signal is received
+	<-sigCh
+}
+
+func startTCPServer(logger *logrus.Logger) {
+	serverAddr := fmt.Sprintf("%s:%d", WGLocalIfaceAddr, TCPServerPort)
+	ln, err := net.Listen(TCPProtocol, serverAddr)
 	if err != nil {
-		log.Println("error reading:", err)
+		logger.Errorf("TCP server listen error: %v", err)
 		return
 	}
+	defer ln.Close()
 
-	log.Printf("Read from remote peer: %s", string(buf[:]))
+	logger.Infof("TCP server ready on %s", serverAddr)
 
-	// todo(): wrap netConn in gRPC
+	for {
+		conn, errServer := ln.Accept()
+		if errServer != nil {
+			logger.Errorf("accept error: %v", errServer)
+			continue
+		}
+
+		go handleTCPConnection(conn, logger)
+	}
+}
+
+func handleTCPConnection(c net.Conn, logger *logrus.Logger) {
+	defer c.Close()
+	buf := make([]byte, TCPMaxBuffer)
+
+	for {
+		n, err := c.Read(buf)
+		if err != nil {
+			if err == io.EOF {
+				logger.Infof("connection closed by %s", c.RemoteAddr())
+			} else {
+				logger.Errorf("read error from %s: %v", c.RemoteAddr(), err)
+			}
+			return
+		}
+		logger.Infof("received msg from %s: %s", c.RemoteAddr().String(), string(buf[:n]))
+	}
+}
+
+func startTCPClient(logger *logrus.Logger, remoteAddr string) {
+	remoteServerAddr := fmt.Sprintf("%s:%d", remoteAddr, TCPClientPort)
+	conn, err := net.Dial(TCPProtocol, remoteServerAddr)
+	if err != nil {
+		logger.Errorf("TCP dial error: %v", err)
+		return
+	}
+	defer conn.Close()
+
+	for {
+		_, err = conn.Write([]byte("hello via TCP over WireGuard"))
+		if err != nil {
+			logger.Errorf("write error: %v", err)
+			return
+		}
+
+		time.Sleep(5 * time.Second)
+	}
 }

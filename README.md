@@ -1,4 +1,15 @@
 # wg-punch
+
+## Detecting NAT type
+```bash
+$ sudo apt install stun-client
+$ stun stun.l.google.com:19302
+STUN client version 0.97
+Primary: Independent Mapping, Independent Filter, preserves ports, will hairpin
+Return value is 0x000003
+```
+
+## Sample usage (in progress)
 ```Go
 package main
 
@@ -55,7 +66,7 @@ func main() {
 		KeepAliveInterval: WireGuardKeepAliveInterval,
 	})
 
-	// Rendezvous server client (registers and discovers peer IPs)
+	// Rendezvous client (registers and discovers peer IPs)
 	rendezvous := client.NewRendezvous("http://rendezvous.yago.ninja:7777")
 
 	// Combine everything into the connector

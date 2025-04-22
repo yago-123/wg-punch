@@ -16,13 +16,13 @@ func main() {
 	// Setup store (you can swap this with a persistent implementation later)
 	rendezvousStore := store.NewMemoryStore()
 
-	// Initialize the server
+	// Initialize the rendez server
 	srv := server.NewRendezvous(rendezvousStore)
 
-	// Start the server
+	// Start the rendezvous server
 	addr := "0.0.0.0:7777"
 	if err := srv.Start(addr); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+		log.Fatalf("Failed to start rendezvous server: %v", err)
 	}
 	log.Printf("Rendezvous server started on %s", addr)
 

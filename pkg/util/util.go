@@ -9,6 +9,11 @@ import (
 	"github.com/pion/stun"
 )
 
+const (
+	UDPMaxBuffer       = 1500
+	DefaultSTUNTimeout = 2 * time.Second
+)
+
 // ConvertAllowedIPs takes a slice of CIDR strings and converts them to a slice of net.IPNet.
 // It returns an error if any string is not a valid CIDR.
 func ConvertAllowedIPs(allowedIPs []string) ([]net.IPNet, error) {
@@ -45,7 +50,7 @@ func GetPublicEndpoint(ctx context.Context, conn *net.UDPConn, servers []string)
 
 // todo(): adjust hardcoded values
 func trySTUNServer(ctx context.Context, conn *net.UDPConn, server string) (*net.UDPAddr, error) {
-	serverAddr, err := net.ResolveUDPAddr("udp", server)
+	serverAddr, err := net.ResolveUDPAddr(UDPProtocol, server)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve STUN server %q: %w", server, err)
 	}
@@ -53,9 +58,9 @@ func trySTUNServer(ctx context.Context, conn *net.UDPConn, server string) (*net.
 	// Build STUN Binding Request
 	req := stun.MustBuild(stun.TransactionID, stun.BindingRequest)
 
-	// Send request
-	if _, err := conn.WriteToUDP(req.Raw, serverAddr); err != nil {
-		return nil, fmt.Errorf("failed to send STUN request to %s: %w", server, err)
+	// Send UDP request to STUN server
+	if _, errWrite := conn.WriteToUDP(req.Raw, serverAddr); errWrite != nil {
+		return nil, fmt.Errorf("failed to send STUN request to %s: %w", server, errWrite)
 	}
 
 	// Respect context deadline for read timeout
@@ -63,10 +68,10 @@ func trySTUNServer(ctx context.Context, conn *net.UDPConn, server string) (*net.
 	if hasDeadline {
 		_ = conn.SetReadDeadline(deadline)
 	} else {
-		_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+		_ = conn.SetReadDeadline(time.Now().Add(DefaultSTUNTimeout))
 	}
 
-	buf := make([]byte, 1500)
+	buf := make([]byte, UDPMaxBuffer)
 	n, _, err := conn.ReadFromUDP(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read STUN response from %s: %w", server, err)
@@ -74,13 +79,13 @@ func trySTUNServer(ctx context.Context, conn *net.UDPConn, server string) (*net.
 
 	var res stun.Message
 	res.Raw = buf[:n]
-	if err := res.Decode(); err != nil {
-		return nil, fmt.Errorf("failed to decode STUN response: %w", err)
+	if errDecode := res.Decode(); errDecode != nil {
+		return nil, fmt.Errorf("failed to decode STUN response: %w", errDecode)
 	}
 
 	var xorAddr stun.XORMappedAddress
-	if err := xorAddr.GetFrom(&res); err != nil {
-		return nil, fmt.Errorf("failed to extract XOR-MAPPED-ADDRESS: %w", err)
+	if errAddr := xorAddr.GetFrom(&res); errAddr != nil {
+		return nil, fmt.Errorf("failed to extract XOR-MAPPED-ADDRESS: %w", errAddr)
 	}
 
 	return &net.UDPAddr{

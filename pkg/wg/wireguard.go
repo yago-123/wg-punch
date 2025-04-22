@@ -9,7 +9,7 @@ import (
 )
 
 type Tunnel interface {
-	Start(ctx context.Context, conn *net.UDPConn, localPrivKey string, peer peer.Info) error
+	Start(ctx context.Context, conn *net.UDPConn, peer peer.Info) error
 	Stop() error
 }
 

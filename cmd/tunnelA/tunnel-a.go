@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/yago-123/wg-punch/pkg/util"
+
 	kernelwg "github.com/yago-123/wg-punch/pkg/wg/kernel"
 
 	"github.com/sirupsen/logrus"
@@ -20,7 +22,6 @@ import (
 const (
 	TunnelHandshakeTimeout = 30 * time.Second
 
-	TCPProtocol   = "tcp"
 	TCPMaxBuffer  = 1024
 	TCPServerPort = 8080
 	TCPClientPort = 8080
@@ -88,7 +89,7 @@ func main() {
 
 	tunnel := kernelwg.NewTunnel(tunnelCfg)
 
-	if errStart := tunnel.Start(ctx, nil, tunnelCfg.PrivateKey, remotePeer); errStart != nil {
+	if errStart := tunnel.Start(ctx, nil, remotePeer); errStart != nil {
 		logger.Errorf("failed to start tunnel: %v", errStart)
 		return
 	}
@@ -109,7 +110,7 @@ func main() {
 
 func startTCPServer(logger *logrus.Logger) {
 	serverAddr := fmt.Sprintf("%s:%d", WGLocalIfaceAddr, TCPServerPort)
-	ln, err := net.Listen(TCPProtocol, serverAddr)
+	ln, err := net.Listen(util.TCPProtocol, serverAddr)
 	if err != nil {
 		logger.Errorf("TCP server listen error: %v", err)
 		return

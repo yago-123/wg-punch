@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/yago-123/wg-punch/pkg/util"
+
 	"github.com/yago-123/wg-punch/pkg/rendez"
 )
 
@@ -84,7 +86,7 @@ func (c *Client) Discover(ctx context.Context, peerID string) (*rendez.PeerRespo
 	}
 
 	// Convert endpoint into UDP address
-	udpAddr, err := net.ResolveUDPAddr("udp", peerResp.Endpoint)
+	udpAddr, err := net.ResolveUDPAddr(util.UDPProtocol, peerResp.Endpoint)
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid endpoint in response: %w", err)
 	}
@@ -103,7 +105,7 @@ func (c *Client) WaitForPeer(ctx context.Context, peerID string, interval time.D
 		case <-ticker.C:
 			res, addr, err := c.Discover(ctx, peerID)
 			if err == nil && res != nil && addr != nil {
-				udpAddr, errUDP := net.ResolveUDPAddr("udp", res.Endpoint)
+				udpAddr, errUDP := net.ResolveUDPAddr(util.UDPProtocol, res.Endpoint)
 				if errUDP != nil {
 					return nil, nil, fmt.Errorf("invalid endpoint in response: %w", err)
 				}

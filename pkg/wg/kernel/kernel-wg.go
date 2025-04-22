@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yago-123/wg-punch/pkg/util"
+
 	"github.com/vishvananda/netlink"
 	"github.com/yago-123/wg-punch/pkg/peer"
 	"github.com/yago-123/wg-punch/pkg/wg"
@@ -31,7 +33,7 @@ func NewTunnel(cfg *wg.TunnelConfig) wg.Tunnel {
 	}
 }
 
-func (kwgt *kernelWGTunnel) Start(ctx context.Context, conn *net.UDPConn, localPrivKey string, peer peer.Info) error {
+func (kwgt *kernelWGTunnel) Start(ctx context.Context, conn *net.UDPConn, peer peer.Info) error {
 	client, err := wgctrl.New()
 	if err != nil {
 		return fmt.Errorf("failed to open wgctrl rendclient: %w", err)
@@ -39,7 +41,7 @@ func (kwgt *kernelWGTunnel) Start(ctx context.Context, conn *net.UDPConn, localP
 	defer client.Close()
 
 	// todo(): move to native wgctrl key type
-	privKey, err := wgtypes.ParseKey(localPrivKey)
+	privKey, err := wgtypes.ParseKey(kwgt.config.PrivateKey)
 	if err != nil {
 		return fmt.Errorf("invalid private key: %w", err)
 	}
@@ -272,7 +274,7 @@ func startHandshakeTriggerLoop(ctx context.Context, endpoint *net.UDPAddr, inter
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			conn, err := net.DialUDP("udp", nil, endpoint)
+			conn, err := net.DialUDP(util.UDPProtocol, nil, endpoint)
 			if err != nil {
 				// log.Printf("Error dialing UDP: %v", err)
 				continue

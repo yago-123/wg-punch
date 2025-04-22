@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/yago-123/wg-punch/pkg/util"
+
 	kernelwg "github.com/yago-123/wg-punch/pkg/wg/kernel"
 
 	"github.com/sirupsen/logrus"
@@ -21,16 +23,15 @@ import (
 )
 
 const (
-	TCPProtocol   = "tcp"
 	TCPServerPort = 8080
 	TCPClientPort = 8080
 	TCPMaxBuffer  = 1024
 
-	TunnelHandshakeTimeout = 30 * time.Minute
+	TunnelHandshakeTimeout = 30 * time.Second
 	RendezvousServer       = "http://rendezvous.yago.ninja:7777"
 
-	LocalPeerID  = "xx1"
-	RemotePeerID = "xx2"
+	LocalPeerID  = "ww1"
+	RemotePeerID = "ww2"
 
 	WGLocalListenPort    = 51821
 	WGLocalIfaceName     = "wg1"
@@ -87,7 +88,7 @@ func main() {
 	localAddr := &net.UDPAddr{IP: net.IPv4zero, Port: tunnelCfg.ListenPort}
 
 	// Connect to peer using a shared peer ID (both sides use same ID)
-	netConn, err := conn.Connect(ctx, localAddr, []string{WGLocalIfaceAddrCIDR}, RemotePeerID, WGLocalPrivKey, WGLocalPubKey)
+	netConn, err := conn.Connect(ctx, localAddr, []string{WGLocalIfaceAddrCIDR}, RemotePeerID, WGLocalPubKey)
 	if err != nil {
 		logger.Errorf("failed to connect to peer: %v", err)
 		return
@@ -112,7 +113,7 @@ func main() {
 
 func startTCPServer(logger *logrus.Logger) {
 	serverAddr := fmt.Sprintf("%s:%d", WGLocalIfaceAddr, TCPServerPort)
-	ln, err := net.Listen(TCPProtocol, serverAddr)
+	ln, err := net.Listen(util.TCPProtocol, serverAddr)
 	if err != nil {
 		logger.Errorf("TCP server listen error: %v", err)
 		return
@@ -152,7 +153,7 @@ func handleTCPConnection(c net.Conn, logger *logrus.Logger) {
 
 func startTCPClient(logger *logrus.Logger, remoteAddr string) {
 	remoteServerAddr := fmt.Sprintf("%s:%d", remoteAddr, TCPClientPort)
-	conn, err := net.Dial(TCPProtocol, remoteServerAddr)
+	conn, err := net.Dial(util.TCPProtocol, remoteServerAddr)
 	if err != nil {
 		logger.Errorf("TCP dial error: %v", err)
 		return

@@ -4,6 +4,8 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/yago-123/wg-punch/pkg/util"
+
 	"github.com/yago-123/wg-punch/pkg/rendez"
 
 	"github.com/gin-gonic/gin"
@@ -38,7 +40,7 @@ func (h *Handler) RegisterHandler(c *gin.Context) {
 	}
 
 	// Convert endpoint string to UDP address
-	udpAddr, err := net.ResolveUDPAddr("udp", req.Endpoint)
+	udpAddr, err := net.ResolveUDPAddr(util.UDPProtocol, req.Endpoint)
 	if err != nil {
 		c.String(http.StatusBadRequest, "invalid endpoint")
 		return

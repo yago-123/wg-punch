@@ -34,14 +34,13 @@ func NewConnector(localPeerID string, p puncher.Puncher, tunnel wg.Tunnel, rende
 	}
 }
 
-func (c *Connector) Connect(ctx context.Context, localAddr *net.UDPAddr, allowedIPs []string, remotePeerID, localPrivKey, localPubKey string) (net.Conn, error) {
-	conn, err := net.ListenUDP("udp", localAddr)
+func (c *Connector) Connect(ctx context.Context, localAddr *net.UDPAddr, allowedIPs []string, remotePeerID, localPubKey string) (net.Conn, error) {
+	conn, err := net.ListenUDP(util.UDPProtocol, localAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to bind UDP: %w", err)
 	}
 
 	// Discover own public address via STUN
-	// todo(): publicAddr must be reused for the UDP connection to be effective
 	publicAddr, err := c.puncher.PublicAddr(ctx, conn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get public addr: %w", err)
@@ -80,8 +79,9 @@ func (c *Connector) Connect(ctx context.Context, localAddr *net.UDPAddr, allowed
 	}
 
 	log.Printf("Connecting to remote peer %s with endpoint %s and allowed IPs %s", remotePeerID, endpoint.String(), remoteAllowedIPs)
+
 	// Start WireGuard tunnel
-	if errTunnel := c.tunnel.Start(ctx, conn, localPrivKey, peer.Info{
+	if errTunnel := c.tunnel.Start(ctx, conn, peer.Info{
 		PublicKey:  remotePeerInfo.PublicKey,
 		Endpoint:   endpoint,
 		AllowedIPs: remoteAllowedIPs,

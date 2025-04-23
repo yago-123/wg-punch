@@ -2,7 +2,7 @@ package connect
 
 import (
 	"context"
-	"fmt"
+	errors "github.com/yago-123/wg-punch/pkg/error"
 	"net"
 
 	"github.com/go-logr/logr"
@@ -40,18 +40,19 @@ func NewConnector(localPeerID string, puncher puncher.Puncher, opts ...Option) *
 	}
 }
 
+// Connect handles the connection process between two peers. From registering the peer until the handshake is done.
 func (c *Connector) Connect(ctx context.Context, tunnel wg.Tunnel, allowedIPs []string, remotePeerID string) (net.Conn, error) {
 	localAddr := &net.UDPAddr{IP: net.IPv4zero, Port: tunnel.ListenPort()}
 
 	conn, err := net.ListenUDP(util.UDPProtocol, localAddr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to bind UDP: %w", err)
+		return nil, errors.Wrap(errors.ErrBindingUDP, err)
 	}
 
 	// Discover own public address via STUN
 	publicAddr, err := c.puncher.PublicAddr(ctx, conn)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get public addr: %w", err)
+		return nil, errors.Wrap(errors.ErrPubAddrRetrieve, err)
 	}
 
 	// Register local peer in rendezvous server
@@ -62,7 +63,7 @@ func (c *Connector) Connect(ctx context.Context, tunnel wg.Tunnel, allowedIPs []
 		AllowedIPs: allowedIPs,
 	}
 	if errRendez := c.rendezClient.Register(ctx, localPeerInfo); errRendez != nil {
-		return nil, fmt.Errorf("failed to register with rendezvous server: %w", errRendez)
+		return nil, errors.Wrap(errors.ErrRegisterPeer, errRendez)
 	}
 
 	c.logger.Info("Registered local peer", "peerID", c.localPeerID, "publicKey", tunnel.PublicKey(), "endpoint", publicAddr.String(), "allowedIPs", allowedIPs)
@@ -70,20 +71,19 @@ func (c *Connector) Connect(ctx context.Context, tunnel wg.Tunnel, allowedIPs []
 	// Wait for peer info from the rendezvous server
 	remotePeerInfo, endpoint, err := c.rendezClient.WaitForPeer(ctx, remotePeerID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get peer info: %w", err)
+		return nil, errors.Wrap(errors.ErrWaitForPeer, err)
 	}
 
 	// Create UDP connection on local public IP
-	// todo() : adjust localAddr to be passed in a more clean way
 	conn, err = c.puncher.Punch(ctx, conn, endpoint)
 	if err != nil {
-		return nil, fmt.Errorf("failed to punch: %w", err)
+		return nil, errors.Wrap(errors.ErrPunchingNAT, err)
 	}
 
 	// Adjust allowedIPs from string to IP format
 	remoteAllowedIPs, err := util.ConvertAllowedIPs(remotePeerInfo.AllowedIPs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert allowed IPs: %w", err)
+		return nil, errors.Wrap(errors.ErrConvertAllowed, err)
 	}
 
 	c.logger.Info("Connecting to remote peer", "peerID", remotePeerID, "endpoint", endpoint.String(), "allowedIPs", remoteAllowedIPs)
@@ -94,7 +94,7 @@ func (c *Connector) Connect(ctx context.Context, tunnel wg.Tunnel, allowedIPs []
 		Endpoint:   endpoint,
 		AllowedIPs: remoteAllowedIPs,
 	}); errTunnel != nil {
-		return nil, fmt.Errorf("failed to start wireguard tunnel: %w", errTunnel)
+		return nil, errors.Wrap(errors.ErrTunnelStart, err)
 	}
 
 	// Return net.Conn (use the raw conn or wrap it)

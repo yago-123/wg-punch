@@ -7,6 +7,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/yago-123/wg-punch/pkg/rendez"
 
 	"github.com/yago-123/wg-punch/pkg/peer"
@@ -22,16 +23,24 @@ type Connector struct {
 	tunnel       wg.Tunnel
 	rendezClient client.Rendezvous
 	waitInterval time.Duration
+	stunServers  []string
+	logger       logr.Logger
 }
 
-func NewConnector(localPeerID string, p puncher.Puncher, tunnel wg.Tunnel, rendezClient client.Rendezvous, waitInterval time.Duration) *Connector {
-	return &Connector{
+func NewConnector(localPeerID string, p puncher.Puncher, tunnel wg.Tunnel, rendezClient client.Rendezvous, waitInterval time.Duration, opts ...Option) *Connector {
+	c := &Connector{
 		localPeerID:  localPeerID,
 		puncher:      p,
 		tunnel:       tunnel,
 		rendezClient: rendezClient,
 		waitInterval: waitInterval,
 	}
+
+	for _, opt := range opts {
+		opt(c)
+	}
+
+	return c
 }
 
 func (c *Connector) Connect(ctx context.Context, localAddr *net.UDPAddr, allowedIPs []string, remotePeerID, localPubKey string) (net.Conn, error) {

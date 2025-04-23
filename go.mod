@@ -4,6 +4,7 @@ go 1.24.1
 
 require (
 	github.com/gin-gonic/gin v1.10.0
+	github.com/go-logr/logr v1.4.2
 	github.com/pion/stun v0.6.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/vishvananda/netlink v1.3.0

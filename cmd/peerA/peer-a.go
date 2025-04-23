@@ -17,8 +17,6 @@ import (
 	kernelwg "github.com/yago-123/wg-punch/pkg/wg/kernel"
 
 	"github.com/yago-123/wg-punch/pkg/connect"
-	"github.com/yago-123/wg-punch/pkg/puncher"
-	"github.com/yago-123/wg-punch/pkg/rendez/client"
 	"github.com/yago-123/wg-punch/pkg/wg"
 )
 
@@ -62,9 +60,6 @@ func main() {
 	// Notify the channel on SIGINT or SIGTERM
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
-	// STUN-based hole puncher
-	puncher := puncher.NewPuncher(stunServers)
-
 	tunnelCfg := &wg.TunnelConfig{
 		PrivateKey:        WGLocalPrivKey,
 		Iface:             WGLocalIfaceName,
@@ -78,15 +73,13 @@ func main() {
 	// WireGuard interface using WireGuard
 	tunnel := kernelwg.NewTunnel(tunnelCfg)
 
-	// Rendezvous server (registers and discovers peer IPs)
-	rendezvous := client.NewRendezvous(RendezvousServer)
-
 	// Combine everything into the connector
 	options := []connect.Option{
-		connect.WithLogger(logger),
+		connect.WithRendezServer(RendezvousServer),
 		connect.WithSTUNServers(stunServers),
+		connect.WithLogger(logger),
 	}
-	conn := connect.NewConnector(LocalPeerID, puncher, tunnel, rendezvous, 1*time.Second, options...)
+	conn := connect.NewConnector(LocalPeerID, tunnel, 1*time.Second, options...)
 
 	// todo(): think about where to put the cancel of the tunnel itself
 	defer tunnel.Stop()

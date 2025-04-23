@@ -151,7 +151,7 @@ func handleTCPConnection(c net.Conn, logger *logrus.Logger) {
 
 func startTCPClient(logger *logrus.Logger) {
 	remoteServerAddr := fmt.Sprintf("%s:%d", WGRemoteIfaceAddr, TCPClientPort)
-	conn, err := net.Dial(TCPProtocol, remoteServerAddr)
+	conn, err := net.Dial(util.TCPProtocol, remoteServerAddr)
 	if err != nil {
 		logger.Errorf("TCP dial error: %v", err)
 		return

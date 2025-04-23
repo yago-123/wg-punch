@@ -20,18 +20,20 @@ type Rendezvous interface {
 	// todo(): configure a TTL for the registration
 	Register(ctx context.Context, req rendez.RegisterRequest) error
 	Discover(ctx context.Context, peerID string) (*rendez.PeerResponse, *net.UDPAddr, error)
-	WaitForPeer(ctx context.Context, peerID string, interval time.Duration) (*rendez.PeerResponse, *net.UDPAddr, error)
+	WaitForPeer(ctx context.Context, peerID string) (*rendez.PeerResponse, *net.UDPAddr, error)
 }
 
 type Client struct {
-	baseURL string
-	client  *http.Client
+	baseURL      string
+	waitInterval time.Duration
+	client       *http.Client
 }
 
-func NewRendezvous(baseURL string) Rendezvous {
+func NewRendezvous(baseURL string, waitInterval time.Duration) Rendezvous {
 	return &Client{
-		baseURL: baseURL,
-		client:  &http.Client{Timeout: RendezvousClientTimeout},
+		baseURL:      baseURL,
+		waitInterval: waitInterval,
+		client:       &http.Client{Timeout: RendezvousClientTimeout},
 	}
 }
 
@@ -94,8 +96,8 @@ func (c *Client) Discover(ctx context.Context, peerID string) (*rendez.PeerRespo
 	return &peerResp, udpAddr, nil
 }
 
-func (c *Client) WaitForPeer(ctx context.Context, peerID string, interval time.Duration) (*rendez.PeerResponse, *net.UDPAddr, error) {
-	ticker := time.NewTicker(interval)
+func (c *Client) WaitForPeer(ctx context.Context, peerID string) (*rendez.PeerResponse, *net.UDPAddr, error) {
+	ticker := time.NewTicker(c.waitInterval)
 	defer ticker.Stop()
 
 	for {

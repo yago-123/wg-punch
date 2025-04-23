@@ -106,6 +106,10 @@ func (kwgt *kernelWGTunnel) Start(ctx context.Context, conn *net.UDPConn, peer p
 	return nil
 }
 
+func (kwgt *kernelWGTunnel) ListenPort() int {
+	return kwgt.config.ListenPort
+}
+
 func (kwgt *kernelWGTunnel) Stop() error {
 	client, err := wgctrl.New()
 	if err != nil {

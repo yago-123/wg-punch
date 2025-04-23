@@ -4,15 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"time"
+
+	"github.com/go-logr/logr"
 
 	"github.com/yago-123/wg-punch/pkg/util"
 )
 
 const (
-	IntervalUDPPackets = 300 * time.Millisecond
+	PunchMessage = "punch"
 )
 
 type Puncher interface {
@@ -21,13 +22,22 @@ type Puncher interface {
 }
 
 type puncher struct {
-	stunServers []string
+	puncherInterval time.Duration
+	stunServers     []string
+	logger          logr.Logger
 }
 
-// todo(): pass conn as argument here?
-func NewPuncher(stunServers []string) Puncher {
+func NewPuncher(opts ...Option) Puncher {
+	cfg := newDefaultConfig()
+
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
 	return &puncher{
-		stunServers: stunServers,
+		puncherInterval: cfg.puncherInterval,
+		stunServers:     cfg.stunServers,
+		logger:          cfg.logger,
 	}
 }
 
@@ -42,11 +52,11 @@ func (p *puncher) Punch(ctx context.Context, conn *net.UDPConn, remoteHint *net.
 		return nil, fmt.Errorf("conn required for punching")
 	}
 
-	log.Printf("punching towards remote hint %s", remoteHint.String())
+	p.logger.Info("punching remote host", "remoteHint", remoteHint.String())
 
 	// Try sending empty UDP packets to open NAT mappings
 	go func() {
-		ticker := time.NewTicker(IntervalUDPPackets)
+		ticker := time.NewTicker(p.puncherInterval)
 		defer ticker.Stop()
 
 		for {
@@ -55,7 +65,7 @@ func (p *puncher) Punch(ctx context.Context, conn *net.UDPConn, remoteHint *net.
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				_, errConn := conn.WriteToUDP([]byte("punch"), remoteHint)
+				_, errConn := conn.WriteToUDP([]byte(PunchMessage), remoteHint)
 				// The connection will be closed right before the WireGuard tunnel is started
 				if errors.Is(errConn, net.ErrClosed) {
 					return

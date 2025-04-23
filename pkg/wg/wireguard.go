@@ -10,6 +10,7 @@ import (
 
 type Tunnel interface {
 	Start(ctx context.Context, conn *net.UDPConn, peer peer.Info) error
+	ListenPort() int
 	Stop() error
 }
 

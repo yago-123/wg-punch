@@ -49,6 +49,8 @@ func GetPublicEndpoint(ctx context.Context, conn *net.UDPConn, servers []string)
 }
 
 // todo(): adjust hardcoded values
+// trySTUNServer sends a STUN Binding Request to the specified server and waits for a response. It returns the public
+// address extracted from the response or an error if the request fails.
 func trySTUNServer(ctx context.Context, conn *net.UDPConn, server string) (*net.UDPAddr, error) {
 	serverAddr, err := net.ResolveUDPAddr(UDPProtocol, server)
 	if err != nil {

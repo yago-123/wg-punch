@@ -19,6 +19,10 @@ func (uwgt *userspaceWGTunnel) Start(ctx context.Context, conn *net.UDPConn, pee
 	return nil
 }
 
+func (uwgt *userspaceWGTunnel) ListenPort() int {
+	return 0
+}
+
 func (uwgt *userspaceWGTunnel) Stop() error {
 	return nil
 }

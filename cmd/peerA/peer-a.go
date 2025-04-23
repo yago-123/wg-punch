@@ -11,6 +11,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/yago-123/wg-punch/pkg/puncher"
+
 	"github.com/yago-123/wg-punch/pkg/util"
 
 	"github.com/go-logr/logr"
@@ -60,6 +62,25 @@ func main() {
 	// Notify the channel on SIGINT or SIGTERM
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
+	puncherOptions := []puncher.Option{
+		puncher.WithPuncherInterval(300 * time.Millisecond),
+		puncher.WithSTUNServers(stunServers),
+		puncher.WithLogger(logger),
+	}
+	// Create a puncher with the STUN servers
+	p := puncher.NewPuncher(puncherOptions...)
+
+	connectorOptions := []connect.Option{
+		connect.WithRendezServer(RendezvousServer),
+		connect.WithWaitInterval(1 * time.Second),
+		connect.WithLogger(logger),
+	}
+	// Create a connector with the puncher
+	conn := connect.NewConnector(LocalPeerID, p, connectorOptions...)
+
+	ctxHandshake, cancel := context.WithTimeout(context.Background(), TunnelHandshakeTimeout)
+	defer cancel()
+
 	tunnelCfg := &wg.TunnelConfig{
 		PrivateKey:        WGLocalPrivKey,
 		Iface:             WGLocalIfaceName,
@@ -73,29 +94,15 @@ func main() {
 	// WireGuard interface using WireGuard
 	tunnel := kernelwg.NewTunnel(tunnelCfg)
 
-	// Combine everything into the connector
-	options := []connect.Option{
-		connect.WithRendezServer(RendezvousServer),
-		connect.WithSTUNServers(stunServers),
-		connect.WithLogger(logger),
-	}
-	conn := connect.NewConnector(LocalPeerID, tunnel, 1*time.Second, options...)
-
-	// todo(): think about where to put the cancel of the tunnel itself
-	defer tunnel.Stop()
-
-	ctx, cancel := context.WithTimeout(context.Background(), TunnelHandshakeTimeout)
-
-	localAddr := &net.UDPAddr{IP: net.IPv4zero, Port: tunnelCfg.ListenPort}
-
 	// Connect to peer using a shared peer ID (both sides use same ID)
-	netConn, err := conn.Connect(ctx, localAddr, []string{WGLocalIfaceAddrCIDR}, RemotePeerID, WGLocalPubKey)
+	netConn, err := conn.Connect(ctxHandshake, tunnel, []string{WGLocalIfaceAddrCIDR}, RemotePeerID, WGLocalPubKey)
 	if err != nil {
 		logger.Error(err, "failed to connect to peer", "localPeer", LocalPeerID, "remotePeerID", RemotePeerID)
 		return
 	}
 
-	defer cancel()
+	// todo(): think about where to put the cancel of the tunnel itself
+	defer tunnel.Stop()
 	defer netConn.Close()
 
 	logger.Info("Tunnel has been stablished! Press Ctrl+C to exit.")

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/yago-123/wg-punch/pkg/rendez"
@@ -19,46 +18,31 @@ import (
 type Connector struct {
 	localPeerID  string
 	puncher      puncher.Puncher
-	tunnel       wg.Tunnel
 	rendezClient client.Rendezvous
-	waitInterval time.Duration
 	logger       logr.Logger
 }
 
-func NewConnector(localPeerID string, tunnel wg.Tunnel, waitInterval time.Duration, opts ...Option) *Connector {
+func NewConnector(localPeerID string, puncher puncher.Puncher, opts ...Option) *Connector {
 	cfg := newDefaultConfig()
 
 	for _, opt := range opts {
 		opt(cfg)
 	}
 
-	c := &Connector{
-		localPeerID:  localPeerID,
-		tunnel:       tunnel,
-		waitInterval: waitInterval,
-		logger:       cfg.logger,
-	}
-
 	// Rendezvous client (registers and discovers peer IPs)
-	rendezClient := client.NewRendezvous(cfg.rendezServerURL)
-	// STUN-based hole puncher
-	puncher := puncher.NewPuncher(cfg.stunServers)
-
-	c.rendezClient = rendezClient
-	c.puncher = puncher
+	rendezClient := client.NewRendezvous(cfg.rendezServerURL, cfg.waitInterval)
 
 	return &Connector{
 		localPeerID:  localPeerID,
-		tunnel:       tunnel,
 		rendezClient: rendezClient,
 		puncher:      puncher,
-		waitInterval: waitInterval,
 		logger:       cfg.logger,
 	}
-
 }
 
-func (c *Connector) Connect(ctx context.Context, localAddr *net.UDPAddr, allowedIPs []string, remotePeerID, localPubKey string) (net.Conn, error) {
+func (c *Connector) Connect(ctx context.Context, tunnel wg.Tunnel, allowedIPs []string, remotePeerID, localPubKey string) (net.Conn, error) {
+	localAddr := &net.UDPAddr{IP: net.IPv4zero, Port: tunnel.ListenPort()}
+
 	conn, err := net.ListenUDP(util.UDPProtocol, localAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to bind UDP: %w", err)
@@ -84,7 +68,7 @@ func (c *Connector) Connect(ctx context.Context, localAddr *net.UDPAddr, allowed
 	c.logger.Info("Registered local peer", "peerID", c.localPeerID, "publicKey", localPubKey, "endpoint", publicAddr.String(), "allowedIPs", allowedIPs)
 
 	// Wait for peer info from the rendezvous server
-	remotePeerInfo, endpoint, err := c.rendezClient.WaitForPeer(ctx, remotePeerID, c.waitInterval)
+	remotePeerInfo, endpoint, err := c.rendezClient.WaitForPeer(ctx, remotePeerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get peer info: %w", err)
 	}
@@ -105,7 +89,7 @@ func (c *Connector) Connect(ctx context.Context, localAddr *net.UDPAddr, allowed
 	c.logger.Info("Connecting to remote peer", "peerID", remotePeerID, "endpoint", endpoint.String(), "allowedIPs", remoteAllowedIPs)
 
 	// Start WireGuard tunnel
-	if errTunnel := c.tunnel.Start(ctx, conn, peer.Info{
+	if errTunnel := tunnel.Start(ctx, conn, peer.Info{
 		PublicKey:  remotePeerInfo.PublicKey,
 		Endpoint:   endpoint,
 		AllowedIPs: remoteAllowedIPs,

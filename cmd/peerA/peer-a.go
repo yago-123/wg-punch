@@ -2,18 +2,15 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"io"
 	"log/slog"
-	"net"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/yago-123/wg-punch/pkg/puncher"
+	"github.com/yago-123/wg-punch/cmd/common"
 
-	"github.com/yago-123/wg-punch/pkg/util"
+	"github.com/yago-123/wg-punch/pkg/puncher"
 
 	"github.com/go-logr/logr"
 	kernelwg "github.com/yago-123/wg-punch/pkg/wg/kernel"
@@ -112,74 +109,33 @@ func main() {
 	logger.Info("Tunnel has been stablished! Press Ctrl+C to exit.")
 
 	// Start TCP server
-	go startTCPServer(logger)
+	tcpServer, err := common.NewTCPServer(WGLocalIfaceAddr, TCPServerPort, logger)
+	if err != nil {
+		logger.Error(err, "failed to create TCP server", "address", WGLocalIfaceAddr)
+		return
+	}
+
+	tcpServer.Start()
+	defer tcpServer.Close()
 
 	// Start TCP client after a delay to ensure server is ready
 	time.Sleep(5 * time.Second)
-	// todo(): adjust the IP to the one assigned by the rendezvous server
-	go startTCPClient(RemotePeerIP, logger)
+
+	// Start TCP client that will query remote peer over WireGuard
+	tcpClient, err := common.NewTCPClient(RemotePeerIP, TCPClientPort, logger)
+	if err != nil {
+		logger.Error(err, "failed to create TCP client", "address", RemotePeerIP)
+		return
+	}
+	defer tcpClient.Close()
+
+	go func() {
+		for {
+			tcpClient.Send("hello via TCP over WireGuard")
+			time.Sleep(3 * time.Second)
+		}
+	}()
 
 	// Block until Ctrl+C signal is received
 	<-sigCh
-}
-
-func startTCPServer(logger logr.Logger) {
-	serverAddr := fmt.Sprintf("%s:%d", WGLocalIfaceAddr, TCPServerPort)
-	ln, err := net.Listen(util.TCPProtocol, serverAddr)
-	if err != nil {
-		logger.Error(err, "TCP server listen error", "address", serverAddr)
-		return
-	}
-	defer ln.Close()
-
-	logger.Info("TCP server ready", "address", serverAddr)
-
-	for {
-		conn, errServer := ln.Accept()
-		if errServer != nil {
-			logger.Error(errServer, "error accepting connection", "address", serverAddr)
-			continue
-		}
-
-		go handleTCPConnection(conn, logger)
-	}
-}
-
-func handleTCPConnection(c net.Conn, logger logr.Logger) {
-	defer c.Close()
-	buf := make([]byte, TCPMaxBuffer)
-
-	for {
-		n, err := c.Read(buf)
-		if err != nil {
-			if err == io.EOF {
-				logger.Info("TCP client disconnected", "address", c.RemoteAddr().String())
-			} else {
-				logger.Info("TCP client read error", "address", c.RemoteAddr().String())
-			}
-			return
-		}
-
-		logger.Info("TCP received message", "remoteAddr", c.RemoteAddr().String(), "message", string(buf[:n]))
-	}
-}
-
-func startTCPClient(remoteAddr string, logger logr.Logger) {
-	remoteServerAddr := fmt.Sprintf("%s:%d", remoteAddr, TCPClientPort)
-	conn, err := net.Dial(util.TCPProtocol, remoteServerAddr)
-	if err != nil {
-		logger.Error(err, "TCP client listen error", "address", remoteServerAddr)
-		return
-	}
-	defer conn.Close()
-
-	for {
-		_, err = conn.Write([]byte("hello via TCP over WireGuard"))
-		if err != nil {
-			logger.Error(err, "TCP client write error", "address", remoteServerAddr)
-			return
-		}
-
-		time.Sleep(5 * time.Second)
-	}
 }

@@ -27,7 +27,7 @@ func main() {
 	log.Printf("- Public : %s\n", base64.StdEncoding.EncodeToString(pubKey[:]))
 
 	// Create rendezvous client
-	client := rendClient.NewRendezvous("http://rendezvous.yago.ninja:7777")
+	client := rendClient.NewRendezvous("http://rendezvous.yago.ninja:7777", 1*time.Second)
 
 	// Register this peer
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

@@ -2,7 +2,6 @@ package kernelwg
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"log"
 	"net"
@@ -25,52 +24,46 @@ const (
 
 type kernelWGTunnel struct {
 	listener *net.UDPConn
-	pubKey   string
+	privKey  wgtypes.Key
 	config   *wg.TunnelConfig
 }
 
 func NewTunnel(cfg *wg.TunnelConfig) (wg.Tunnel, error) {
 	// todo(): validate config
 
-	pubKey, err := derivePubKeyFrom(cfg.PrivKey)
+	privKey, err := wgtypes.ParseKey(cfg.PrivKey)
 	if err != nil {
-		log.Fatalf("failed to derive public key: %v", err)
-		return nil, fmt.Errorf("failed to derive public key: %v", err)
+		log.Fatalf("failed to parse private key: %v", err)
+		return nil, fmt.Errorf("failed to parse private key: %v", err)
 	}
 
 	return &kernelWGTunnel{
-		pubKey: pubKey,
-		config: cfg,
+		privKey: privKey,
+		config:  cfg,
 	}, nil
 }
 
-func (kwgt *kernelWGTunnel) Start(ctx context.Context, conn *net.UDPConn, peer peer.Info) error {
+func (kwgt *kernelWGTunnel) Start(ctx context.Context, conn *net.UDPConn, remotePeer peer.Info) error {
 	client, err := wgctrl.New()
 	if err != nil {
 		return fmt.Errorf("failed to open wgctrl rendclient: %w", err)
 	}
 	defer client.Close()
 
-	// todo(): move to native wgctrl key type
-	privKey, err := wgtypes.ParseKey(kwgt.config.PrivKey)
-	if err != nil {
-		return fmt.Errorf("invalid private key: %w", err)
-	}
-
-	remotePubKey, err := wgtypes.ParseKey(peer.PublicKey)
+	remotePubKey, err := wgtypes.ParseKey(remotePeer.PublicKey)
 	if err != nil {
 		return fmt.Errorf("invalid remote public key: %w", err)
 	}
 
 	cfg := wgtypes.Config{
-		PrivateKey:   &privKey,
+		PrivateKey:   &kwgt.privKey,
 		ListenPort:   &kwgt.config.ListenPort,
 		ReplacePeers: kwgt.config.ReplacePeer,
 		Peers: []wgtypes.PeerConfig{
 			{
 				PublicKey:                   remotePubKey,
-				Endpoint:                    peer.Endpoint,
-				AllowedIPs:                  peer.AllowedIPs,
+				Endpoint:                    remotePeer.Endpoint,
+				AllowedIPs:                  remotePeer.AllowedIPs,
 				PersistentKeepaliveInterval: &kwgt.config.KeepAliveInterval,
 			},
 		},
@@ -86,8 +79,8 @@ func (kwgt *kernelWGTunnel) Start(ctx context.Context, conn *net.UDPConn, peer p
 		return fmt.Errorf("failed to assign address to interface: %w", err)
 	}
 
-	if err = kwgt.addPeerRoutes(kwgt.config.Iface, peer.AllowedIPs); err != nil {
-		return fmt.Errorf("failed to add peer routes: %w", err)
+	if err = kwgt.addPeerRoutes(kwgt.config.Iface, remotePeer.AllowedIPs); err != nil {
+		return fmt.Errorf("failed to add remotePeer routes: %w", err)
 	}
 
 	// todo(): this check should go away
@@ -107,7 +100,7 @@ func (kwgt *kernelWGTunnel) Start(ctx context.Context, conn *net.UDPConn, peer p
 	ctxInit, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
-	go startHandshakeTriggerLoop(ctxInit, peer.Endpoint, 1*time.Second)
+	go startHandshakeTriggerLoop(ctxInit, remotePeer.Endpoint, 1*time.Second)
 
 	if errHandshake := kwgt.waitForHandshake(ctx, client, remotePubKey); errHandshake != nil {
 		return fmt.Errorf("failed to wait for handshake: %w", errHandshake)
@@ -122,7 +115,7 @@ func (kwgt *kernelWGTunnel) ListenPort() int {
 }
 
 func (kwgt *kernelWGTunnel) PublicKey() string {
-	return kwgt.pubKey
+	return kwgt.privKey.PublicKey().String()
 }
 
 func (kwgt *kernelWGTunnel) Stop() error {
@@ -271,17 +264,6 @@ func (kwgt *kernelWGTunnel) waitForHandshake(ctx context.Context, wgClient *wgct
 			}
 		}
 	}
-}
-
-// derivePubKeyFrom derives the public key from the private key
-func derivePubKeyFrom(privKey string) (string, error) {
-	privKeyBytes, err := wgtypes.ParseKey(privKey)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse private key: %w", err)
-	}
-
-	pubKey := privKeyBytes.PublicKey()
-	return base64.StdEncoding.EncodeToString(pubKey[:]), nil
 }
 
 // hasHandshake checks if the peer has a handshake with the given public key

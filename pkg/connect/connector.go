@@ -2,8 +2,9 @@ package connect
 
 import (
 	"context"
-	errors "github.com/yago-123/wg-punch/pkg/error"
 	"net"
+
+	errors "github.com/yago-123/wg-punch/pkg/error"
 
 	"github.com/go-logr/logr"
 	"github.com/yago-123/wg-punch/pkg/rendez"

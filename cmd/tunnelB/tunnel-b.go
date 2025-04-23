@@ -58,7 +58,7 @@ func main() {
 
 	// Configure the tunnel
 	tunnelCfg := &wg.TunnelConfig{
-		PrivateKey:        WGPrivKey,
+		PrivKey:           WGPrivKey,
 		Iface:             WGLocalIfaceName,
 		IfaceIPv4CIDR:     WGLocalIfaceAddrCIDR,
 		ListenPort:        WGLocalListenPort,
@@ -88,7 +88,11 @@ func main() {
 		},
 	}
 
-	tunnel := kernelwg.NewTunnel(tunnelCfg)
+	tunnel, err := kernelwg.NewTunnel(tunnelCfg)
+	if err != nil {
+		logger.Errorf("failed to create tunnel: %v", err)
+		return
+	}
 
 	if errStart := tunnel.Start(ctx, nil, remotePeer); errStart != nil {
 		logger.Errorf("failed to start tunnel: %v", errStart)

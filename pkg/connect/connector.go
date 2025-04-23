@@ -40,7 +40,7 @@ func NewConnector(localPeerID string, puncher puncher.Puncher, opts ...Option) *
 	}
 }
 
-func (c *Connector) Connect(ctx context.Context, tunnel wg.Tunnel, allowedIPs []string, remotePeerID, localPubKey string) (net.Conn, error) {
+func (c *Connector) Connect(ctx context.Context, tunnel wg.Tunnel, allowedIPs []string, remotePeerID string) (net.Conn, error) {
 	localAddr := &net.UDPAddr{IP: net.IPv4zero, Port: tunnel.ListenPort()}
 
 	conn, err := net.ListenUDP(util.UDPProtocol, localAddr)
@@ -57,7 +57,7 @@ func (c *Connector) Connect(ctx context.Context, tunnel wg.Tunnel, allowedIPs []
 	// Register local peer in rendezvous server
 	localPeerInfo := rendez.RegisterRequest{
 		PeerID:     c.localPeerID,
-		PublicKey:  localPubKey,
+		PublicKey:  tunnel.PublicKey(),
 		Endpoint:   publicAddr.String(),
 		AllowedIPs: allowedIPs,
 	}
@@ -65,7 +65,7 @@ func (c *Connector) Connect(ctx context.Context, tunnel wg.Tunnel, allowedIPs []
 		return nil, fmt.Errorf("failed to register with rendezvous server: %w", errRendez)
 	}
 
-	c.logger.Info("Registered local peer", "peerID", c.localPeerID, "publicKey", localPubKey, "endpoint", publicAddr.String(), "allowedIPs", allowedIPs)
+	c.logger.Info("Registered local peer", "peerID", c.localPeerID, "publicKey", tunnel.PublicKey(), "endpoint", publicAddr.String(), "allowedIPs", allowedIPs)
 
 	// Wait for peer info from the rendezvous server
 	remotePeerInfo, endpoint, err := c.rendezClient.WaitForPeer(ctx, remotePeerID)

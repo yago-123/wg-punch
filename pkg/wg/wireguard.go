@@ -10,12 +10,13 @@ import (
 
 type Tunnel interface {
 	Start(ctx context.Context, conn *net.UDPConn, peer peer.Info) error
+	PublicKey() string
 	ListenPort() int
 	Stop() error
 }
 
 type TunnelConfig struct {
-	PrivateKey        string
+	PrivKey           string
 	Iface             string
 	IfaceIPv4CIDR     string
 	ListenPort        int

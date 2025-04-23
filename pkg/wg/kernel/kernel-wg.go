@@ -2,6 +2,7 @@ package kernelwg
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"log"
 	"net"
@@ -23,14 +24,24 @@ const (
 )
 
 type kernelWGTunnel struct {
-	config   *wg.TunnelConfig
 	listener *net.UDPConn
+	pubKey   string
+	config   *wg.TunnelConfig
 }
 
-func NewTunnel(cfg *wg.TunnelConfig) wg.Tunnel {
-	return &kernelWGTunnel{
-		config: cfg,
+func NewTunnel(cfg *wg.TunnelConfig) (wg.Tunnel, error) {
+	// todo(): validate config
+
+	pubKey, err := derivePubKeyFrom(cfg.PrivKey)
+	if err != nil {
+		log.Fatalf("failed to derive public key: %v", err)
+		return nil, fmt.Errorf("failed to derive public key: %v", err)
 	}
+
+	return &kernelWGTunnel{
+		pubKey: pubKey,
+		config: cfg,
+	}, nil
 }
 
 func (kwgt *kernelWGTunnel) Start(ctx context.Context, conn *net.UDPConn, peer peer.Info) error {
@@ -41,7 +52,7 @@ func (kwgt *kernelWGTunnel) Start(ctx context.Context, conn *net.UDPConn, peer p
 	defer client.Close()
 
 	// todo(): move to native wgctrl key type
-	privKey, err := wgtypes.ParseKey(kwgt.config.PrivateKey)
+	privKey, err := wgtypes.ParseKey(kwgt.config.PrivKey)
 	if err != nil {
 		return fmt.Errorf("invalid private key: %w", err)
 	}
@@ -108,6 +119,10 @@ func (kwgt *kernelWGTunnel) Start(ctx context.Context, conn *net.UDPConn, peer p
 
 func (kwgt *kernelWGTunnel) ListenPort() int {
 	return kwgt.config.ListenPort
+}
+
+func (kwgt *kernelWGTunnel) PublicKey() string {
+	return kwgt.pubKey
 }
 
 func (kwgt *kernelWGTunnel) Stop() error {
@@ -256,6 +271,17 @@ func (kwgt *kernelWGTunnel) waitForHandshake(ctx context.Context, wgClient *wgct
 			}
 		}
 	}
+}
+
+// derivePubKeyFrom derives the public key from the private key
+func derivePubKeyFrom(privKey string) (string, error) {
+	privKeyBytes, err := wgtypes.ParseKey(privKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse private key: %w", err)
+	}
+
+	pubKey := privKeyBytes.PublicKey()
+	return base64.StdEncoding.EncodeToString(pubKey[:]), nil
 }
 
 // hasHandshake checks if the peer has a handshake with the given public key

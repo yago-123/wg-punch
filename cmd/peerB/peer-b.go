@@ -83,7 +83,7 @@ func main() {
 	defer cancel()
 
 	tunnelCfg := &wg.TunnelConfig{
-		PrivateKey:        WGLocalPrivKey,
+		PrivKey:           WGLocalPrivKey,
 		Iface:             WGLocalIfaceName,
 		IfaceIPv4CIDR:     WGLocalIfaceAddrCIDR,
 		ListenPort:        WGLocalListenPort,
@@ -92,11 +92,15 @@ func main() {
 		KeepAliveInterval: WGKeepAliveInterval,
 	}
 
-	// WireGuard interface using WireGuard
-	tunnel := kernelwg.NewTunnel(tunnelCfg)
+	// Initialize WireGuard interface using WireGuard
+	tunnel, err := kernelwg.NewTunnel(tunnelCfg)
+	if err != nil {
+		logger.Error(err, "failed to create tunnel", "localPeer", LocalPeerID)
+		return
+	}
 
 	// Connect to peer using a shared peer ID (both sides use same ID)
-	netConn, err := conn.Connect(ctxHandshake, tunnel, []string{WGLocalIfaceAddrCIDR}, RemotePeerID, WGLocalPubKey)
+	netConn, err := conn.Connect(ctxHandshake, tunnel, []string{WGLocalIfaceAddrCIDR}, RemotePeerID)
 	if err != nil {
 		logger.Error(err, "failed to connect to peer", "localPeer", LocalPeerID, "remotePeerID", RemotePeerID)
 		return

@@ -8,13 +8,9 @@ import (
 
 const (
 	defaultPuncherInterval = 300 * time.Millisecond
-)
 
-var (
-	defaultSTUNServers = []string{
-		"stun.l.google.com:19302",
-		"stun1.l.google.com:19302",
-	}
+	defaultSTUNServer1 = "stun.l.google.com:19302"
+	defaultSTUNServer2 = "stun1.l.google.com:19302"
 )
 
 type config struct {
@@ -28,7 +24,7 @@ type Option func(*config)
 func newDefaultConfig() *config {
 	return &config{
 		puncherInterval: defaultPuncherInterval,
-		stunServers:     defaultSTUNServers,
+		stunServers:     []string{defaultSTUNServer1, defaultSTUNServer2},
 		logger:          logr.Discard(),
 	}
 }

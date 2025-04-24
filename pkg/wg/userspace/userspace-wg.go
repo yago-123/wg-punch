@@ -15,8 +15,12 @@ func NewTunnel(cfg *wg.TunnelConfig) wg.Tunnel {
 	return &userspaceWGTunnel{}
 }
 
-func (uwgt *userspaceWGTunnel) Start(ctx context.Context, conn *net.UDPConn, peer peer.Info) error {
+func (uwgt *userspaceWGTunnel) Start(_ context.Context, _ *net.UDPConn, _ peer.Info) error {
 	return nil
+}
+
+func (uwgt *userspaceWGTunnel) PublicKey() string {
+	return ""
 }
 
 func (uwgt *userspaceWGTunnel) ListenPort() int {

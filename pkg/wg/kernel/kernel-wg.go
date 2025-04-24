@@ -19,7 +19,8 @@ import (
 )
 
 const (
-	WireGuardLinkType = "wireguard"
+	WireGuardLinkType   = "wireguard"
+	HandshakeTriggerMsg = "hello wg"
 )
 
 type kernelWGTunnel struct {
@@ -34,7 +35,7 @@ func NewTunnel(cfg *wg.TunnelConfig) (wg.Tunnel, error) {
 	privKey, err := wgtypes.ParseKey(cfg.PrivKey)
 	if err != nil {
 		log.Fatalf("failed to parse private key: %v", err)
-		return nil, fmt.Errorf("failed to parse private key: %v", err)
+		return nil, fmt.Errorf("failed to parse private key: %w", err)
 	}
 
 	return &kernelWGTunnel{
@@ -100,7 +101,7 @@ func (kwgt *kernelWGTunnel) Start(ctx context.Context, conn *net.UDPConn, remote
 	ctxInit, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
-	go startHandshakeTriggerLoop(ctxInit, remotePeer.Endpoint, 1*time.Second)
+	go kwgt.startHandshakeTriggerLoop(ctxInit, remotePeer.Endpoint, 1*time.Second)
 
 	if errHandshake := kwgt.waitForHandshake(ctx, client, remotePubKey); errHandshake != nil {
 		return fmt.Errorf("failed to wait for handshake: %w", errHandshake)
@@ -266,18 +267,8 @@ func (kwgt *kernelWGTunnel) waitForHandshake(ctx context.Context, wgClient *wgct
 	}
 }
 
-// hasHandshake checks if the peer has a handshake with the given public key
-func hasHandshake(device *wgtypes.Device, remotePubKey wgtypes.Key) bool {
-	for _, peer := range device.Peers {
-		if peer.PublicKey == remotePubKey && !peer.LastHandshakeTime.IsZero() {
-			return true
-		}
-	}
-	return false
-}
-
 // todo(): remove
-func startHandshakeTriggerLoop(ctx context.Context, endpoint *net.UDPAddr, interval time.Duration) {
+func (kwgt *kernelWGTunnel) startHandshakeTriggerLoop(ctx context.Context, endpoint *net.UDPAddr, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -292,12 +283,23 @@ func startHandshakeTriggerLoop(ctx context.Context, endpoint *net.UDPAddr, inter
 				continue
 			}
 
-			_, err = conn.Write([]byte("hello wg"))
+			_, err = conn.Write([]byte(HandshakeTriggerMsg))
 			conn.Close()
 
 			if err != nil {
+				// kwgt
 				// log.Printf("Error sending handshake to %s: %v", endpoint.String(), err)
 			}
 		}
 	}
+}
+
+// hasHandshake checks if the peer has a handshake with the given public key
+func hasHandshake(device *wgtypes.Device, remotePubKey wgtypes.Key) bool {
+	for _, peer := range device.Peers {
+		if peer.PublicKey == remotePubKey && !peer.LastHandshakeTime.IsZero() {
+			return true
+		}
+	}
+	return false
 }

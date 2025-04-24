@@ -2,25 +2,25 @@ package connect
 
 import (
 	"context"
+	"github.com/yago-123/peer-hub/pkg/types"
 	"net"
 
 	errors "github.com/yago-123/wg-punch/pkg/error"
 
 	"github.com/go-logr/logr"
-	"github.com/yago-123/wg-punch/pkg/rendez"
 
+	"github.com/yago-123/peer-hub/pkg/client"
 	"github.com/yago-123/wg-punch/pkg/peer"
 	"github.com/yago-123/wg-punch/pkg/puncher"
-	"github.com/yago-123/wg-punch/pkg/rendez/client"
 	"github.com/yago-123/wg-punch/pkg/util"
 	"github.com/yago-123/wg-punch/pkg/wg"
 )
 
 type Connector struct {
-	localPeerID  string
-	puncher      puncher.Puncher
-	rendezClient client.Rendezvous
-	logger       logr.Logger
+	localPeerID string
+	puncher     puncher.Puncher
+	rendClient  client.Rendezvous
+	logger      logr.Logger
 }
 
 func NewConnector(localPeerID string, puncher puncher.Puncher, opts ...Option) *Connector {
@@ -31,13 +31,13 @@ func NewConnector(localPeerID string, puncher puncher.Puncher, opts ...Option) *
 	}
 
 	// Rendezvous client (registers and discovers peer IPs)
-	rendezClient := client.NewRendezvous(cfg.rendezServerURL, cfg.waitInterval)
+	rendClient := client.New(cfg.rendezServerURL, cfg.waitInterval)
 
 	return &Connector{
-		localPeerID:  localPeerID,
-		rendezClient: rendezClient,
-		puncher:      puncher,
-		logger:       cfg.logger,
+		localPeerID: localPeerID,
+		rendClient:  rendClient,
+		puncher:     puncher,
+		logger:      cfg.logger,
 	}
 }
 
@@ -57,20 +57,20 @@ func (c *Connector) Connect(ctx context.Context, tunnel wg.Tunnel, allowedIPs []
 	}
 
 	// Register local peer in rendezvous server
-	localPeerInfo := rendez.RegisterRequest{
+	localPeerInfo := types.RegisterRequest{
 		PeerID:     c.localPeerID,
 		PublicKey:  tunnel.PublicKey(),
 		Endpoint:   publicAddr.String(),
 		AllowedIPs: allowedIPs,
 	}
-	if errRendez := c.rendezClient.Register(ctx, localPeerInfo); errRendez != nil {
+	if errRendez := c.rendClient.Register(ctx, localPeerInfo); errRendez != nil {
 		return nil, errors.Wrap(errors.ErrRegisterPeer, errRendez)
 	}
 
 	c.logger.Info("Registered local peer", "peerID", c.localPeerID, "publicKey", tunnel.PublicKey(), "endpoint", publicAddr.String(), "allowedIPs", allowedIPs)
 
 	// Wait for peer info from the rendezvous server
-	remotePeerInfo, endpoint, err := c.rendezClient.WaitForPeer(ctx, remotePeerID)
+	remotePeerInfo, endpoint, err := c.rendClient.WaitForPeer(ctx, remotePeerID)
 	if err != nil {
 		return nil, errors.Wrap(errors.ErrWaitForPeer, err)
 	}

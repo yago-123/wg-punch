@@ -17,5 +17,5 @@ var (
 )
 
 func Wrap(step error, err error) error {
-	return fmt.Errorf("%w: %v", step, err)
+	return fmt.Errorf("%w: %w", step, err)
 }

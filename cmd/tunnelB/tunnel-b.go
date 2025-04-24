@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -42,6 +43,8 @@ const (
 	WGRemotePubKey        = "HhvuS5kX7kuqhlwnvbX7UjdFrjABQFShZ1q9qRSX9xI="
 	WGRemoteIfaceAddr     = "10.1.1.1"
 	WGRemoteIfaceAddrCIDR = "10.1.1.1/32"
+
+	DelayClientStart = 5 * time.Second
 )
 
 func main() {
@@ -106,7 +109,7 @@ func main() {
 	go startTCPServer(logger)
 
 	// Start TCP client after a delay to ensure server is ready
-	time.Sleep(5 * time.Second)
+	time.Sleep(DelayClientStart)
 	go startTCPClient(logger)
 
 	// Block until Ctrl+C signal is received
@@ -142,7 +145,7 @@ func handleTCPConnection(c net.Conn, logger *logrus.Logger) {
 	for {
 		n, err := c.Read(buf)
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				logger.Infof("connection closed by %s", c.RemoteAddr())
 			} else {
 				logger.Errorf("read error from %s: %v", c.RemoteAddr(), err)
@@ -169,6 +172,6 @@ func startTCPClient(logger *logrus.Logger) {
 			return
 		}
 
-		time.Sleep(5 * time.Second)
+		time.Sleep(DelayClientStart)
 	}
 }

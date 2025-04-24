@@ -28,8 +28,8 @@ const (
 	TunnelHandshakeTimeout = 30 * time.Second
 	RendezvousServer       = "http://rendezvous.yago.ninja:7777"
 
-	LocalPeerID  = "ww2"
-	RemotePeerID = "ww1"
+	LocalPeerID  = "o2"
+	RemotePeerID = "o1"
 
 	WGLocalListenPort    = 51822
 	WGLocalIfaceName     = "wg2"
@@ -40,9 +40,10 @@ const (
 	RemotePeerIP = "10.1.1.1"
 
 	WGLocalPrivKey = "SEK/qGXalmKu3yPhkvZThcc8aQxordG5RkUz0/4jcFE="
-	WGLocalPubKey  = "CZq8h1yJSHkbLHtguwr6im+V5TNRrrCjYj6Y+XOR6wI="
 
 	WGKeepAliveInterval = 5 * time.Second
+
+	DelayClientStart = 5 * time.Second
 )
 
 var stunServers = []string{
@@ -51,7 +52,7 @@ var stunServers = []string{
 }
 
 func main() {
-	slogLogger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slogLogger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	logger := logr.FromSlogHandler(slogLogger.Handler())
 
 	// Create a channel to listen for signals
@@ -120,7 +121,7 @@ func main() {
 	defer tcpServer.Close()
 
 	// Start TCP client after a delay to ensure server is ready
-	time.Sleep(5 * time.Second)
+	time.Sleep(DelayClientStart)
 
 	// Start TCP client that will query remote peer over WireGuard
 	tcpClient, err := common.NewTCPClient(RemotePeerIP, TCPClientPort, logger)
@@ -133,7 +134,7 @@ func main() {
 	go func() {
 		for {
 			tcpClient.Send("hello via TCP over WireGuard")
-			time.Sleep(3 * time.Second)
+			time.Sleep(DelayClientStart)
 		}
 	}()
 

@@ -14,7 +14,6 @@ const (
 type config struct {
 	rendezServerURL string
 	waitInterval    time.Duration
-	stunServers     []string
 	logger          logr.Logger
 }
 

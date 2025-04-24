@@ -40,6 +40,7 @@ require (
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/vishvananda/netns v0.0.4 // indirect
+	github.com/yago-123/peer-hub v0.0.0-20250424153946-19fd6d2b7af2 // indirect
 	golang.org/x/arch v0.8.0 // indirect
 	golang.org/x/crypto v0.31.0 // indirect
 	golang.org/x/net v0.33.0 // indirect

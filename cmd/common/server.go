@@ -1,6 +1,7 @@
 package common
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -63,7 +64,7 @@ func (s *TCPServer) handleTCPConnection(c net.Conn) {
 	for {
 		n, err := c.Read(buf)
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				s.logger.Info("TCP client disconnected", "address", c.RemoteAddr().String())
 			} else {
 				s.logger.Info("TCP client read error", "address", c.RemoteAddr().String())

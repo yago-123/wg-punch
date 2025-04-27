@@ -2,8 +2,9 @@ package connect
 
 import (
 	"context"
-	"github.com/yago-123/peer-hub/pkg/types"
 	"net"
+
+	"github.com/yago-123/peer-hub/pkg/types"
 
 	errors "github.com/yago-123/wg-punch/pkg/error"
 

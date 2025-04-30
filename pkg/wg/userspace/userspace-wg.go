@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
+
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/go-logr/logr"
 	"github.com/vishvananda/netlink"
@@ -31,23 +34,78 @@ const (
 
 type userspaceWGTunnel struct {
 	config *wg.TunnelConfig
-	logger logr.Logger
+
+	privKey wgtypes.Key
+	logger  logr.Logger
 }
 
 func New(cfg *wg.TunnelConfig, logger logr.Logger) (wg.Tunnel, error) {
+	privKey, err := wgtypes.ParseKey(cfg.PrivKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse private key: %w", err)
+	}
+
 	return &userspaceWGTunnel{
-		config: cfg,
+		privKey: privKey,
+		config:  cfg,
+		logger:  logger,
 	}, nil
 }
 
 func (u *userspaceWGTunnel) Start(ctx context.Context, conn *net.UDPConn, remotePeer peer.Info) error {
+	//
 	tun, err := u.ensureTunInterfaceExists(u.config.Iface)
 	if err != nil {
 		return fmt.Errorf("failed to ensure TUN interface exists: %w", err)
 	}
 
+	// todo(): handle logger properly
 	logger := device.NewLogger(device.LogLevelVerbose, "wireguard: ")
-	_ = device.NewDevice(tun, NewUDPBind(conn), logger)
+
+	// Spawn new virtual device that will handle packets in userspace
+	tunDevice := device.NewDevice(tun, NewUDPBind(conn), logger)
+
+	//
+	remotePubKey, err := wgtypes.ParseKey(remotePeer.PublicKey)
+	if err != nil {
+		return fmt.Errorf("invalid remote public key: %w", err)
+	}
+
+	wgConfig := wgtypes.Config{
+		PrivateKey:   &u.privKey,
+		ListenPort:   &u.config.ListenPort,
+		ReplacePeers: u.config.ReplacePeer,
+		Peers: []wgtypes.PeerConfig{
+			{
+				PublicKey:                   remotePubKey,
+				Endpoint:                    remotePeer.Endpoint,
+				AllowedIPs:                  remotePeer.AllowedIPs,
+				PersistentKeepaliveInterval: &u.config.KeepAliveInterval,
+			},
+		},
+	}
+
+	uapiConfig, err := ConvertWgTypesToUAPI(wgConfig)
+	if err != nil {
+		return fmt.Errorf("failed to convert wgtypes.Config to UAPI: %w", err)
+	}
+
+	// Pass the configuration to the device via IPC
+	if errIpc := tunDevice.IpcSetOperation(strings.NewReader(uapiConfig)); errIpc != nil {
+		return fmt.Errorf("failed to set IPC operation: %w", errIpc)
+	}
+
+	// Bring up the TUN device
+	if errDevice := tunDevice.Up(); errDevice != nil {
+		tunDevice.Close()
+		return fmt.Errorf("failed to bring up TUN device: %w", errDevice)
+	}
+
+	// todo: rethink
+	go func() {
+		<-ctx.Done()
+		tunDevice.Close()
+	}()
 
 	return nil
 }

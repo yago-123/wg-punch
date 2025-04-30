@@ -3,8 +3,9 @@ package userspacewg
 import (
 	"encoding/hex"
 	"fmt"
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"strings"
+
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
 // ConvertWgTypesToUAPI converts WireGuard configuration to a UAPI string format

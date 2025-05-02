@@ -77,9 +77,9 @@ func (c *Connector) Connect(ctx context.Context, tunnel wg.Tunnel, allowedIPs []
 	}
 
 	// Create UDP connection on local public IP
-	conn, err = c.puncher.Punch(ctx, conn, endpoint)
-	if err != nil {
-		return nil, errors.Wrap(errors.ErrPunchingNAT, err)
+	cancelPunch, errPunch := c.puncher.Punch(ctx, conn, endpoint)
+	if errPunch != nil {
+		return nil, errors.Wrap(errors.ErrPunchingNAT, errPunch)
 	}
 
 	// Adjust allowedIPs from string to IP format
@@ -89,6 +89,9 @@ func (c *Connector) Connect(ctx context.Context, tunnel wg.Tunnel, allowedIPs []
 	}
 
 	c.logger.Info("Connecting to remote peer", "peerID", remotePeerID, "endpoint", endpoint.String(), "allowedIPs", remoteAllowedIPs)
+
+	// todo(): pass this argument to the tunnel so that it can be triggered RIGHT BEFORE the connection takeover
+	cancelPunch()
 
 	// Start WireGuard tunnel
 	if errTunnel := tunnel.Start(ctx, conn, peer.Info{

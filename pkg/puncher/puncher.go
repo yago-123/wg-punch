@@ -17,7 +17,7 @@ const (
 )
 
 type Puncher interface {
-	Punch(ctx context.Context, conn *net.UDPConn, remoteHint *net.UDPAddr) (*net.UDPConn, error)
+	Punch(ctx context.Context, conn *net.UDPConn, remoteHint *net.UDPAddr) (context.CancelFunc, error)
 	PublicAddr(ctx context.Context, conn *net.UDPConn) (*net.UDPAddr, error)
 }
 
@@ -41,18 +41,22 @@ func NewPuncher(opts ...Option) Puncher {
 	}
 }
 
-func (p *puncher) Punch(ctx context.Context, conn *net.UDPConn, remoteHint *net.UDPAddr) (*net.UDPConn, error) {
+// Punch attempts to establish a UDP connection with the remote peer by sending empty UDP packets. The return value is
+// a
+func (p *puncher) Punch(ctx context.Context, conn *net.UDPConn, remoteHint *net.UDPAddr) (context.CancelFunc, error) {
 	// If remoteHint is nil, return an error
 	if remoteHint == nil {
-		return nil, fmt.Errorf("remote hint required for punching")
+		return func() {}, fmt.Errorf("remote hint required for punching")
 	}
 
 	// todo(): adjust
 	if conn == nil {
-		return nil, fmt.Errorf("conn required for punching")
+		return func() {}, fmt.Errorf("conn required for punching")
 	}
 
 	p.logger.Info("punching remote host", "remoteHint", remoteHint.String())
+
+	ctxPunch, cancelPunch := context.WithCancel(ctx)
 
 	// Try sending empty UDP packets to open NAT mappings
 	go func() {
@@ -61,8 +65,10 @@ func (p *puncher) Punch(ctx context.Context, conn *net.UDPConn, remoteHint *net.
 
 		for {
 			select {
-			// todo(): make sure this can be cancelled once the tunnel have handshaked
-			case <-ctx.Done():
+			// This context might be triggered if the handshake timeout expires or if the cancel func is called,
+			// the cancel func must be called before the WireGuard tunnel is started so that the connection is
+			// managed by a single entity
+			case <-ctxPunch.Done():
 				return
 			case <-ticker.C:
 				_, errConn := conn.WriteToUDP([]byte(PunchMessage), remoteHint)
@@ -77,7 +83,7 @@ func (p *puncher) Punch(ctx context.Context, conn *net.UDPConn, remoteHint *net.
 		}
 	}()
 
-	return conn, nil
+	return cancelPunch, nil
 }
 
 func (p *puncher) PublicAddr(ctx context.Context, conn *net.UDPConn) (*net.UDPAddr, error) {

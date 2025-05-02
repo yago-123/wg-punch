@@ -3,10 +3,10 @@ package userspacewg
 import (
 	"context"
 	"fmt"
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"net"
 	"strings"
-
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/vishvananda/netlink"
@@ -36,7 +36,11 @@ type userspaceWGTunnel struct {
 	config *wg.TunnelConfig
 
 	privKey wgtypes.Key
-	logger  logr.Logger
+
+	tunDevice *device.Device
+	conn      *net.UDPConn
+
+	logger logr.Logger
 }
 
 func New(cfg *wg.TunnelConfig, logger logr.Logger) (wg.Tunnel, error) {
@@ -53,17 +57,18 @@ func New(cfg *wg.TunnelConfig, logger logr.Logger) (wg.Tunnel, error) {
 }
 
 func (u *userspaceWGTunnel) Start(ctx context.Context, conn *net.UDPConn, remotePeer peer.Info) error {
-	//
 	tun, err := u.ensureTunInterfaceExists(u.config.Iface)
 	if err != nil {
 		return fmt.Errorf("failed to ensure TUN interface exists: %w", err)
 	}
 
-	// todo(): handle logger properly
+	// Create logger for the WireGuard device todo(): this needs rethinking
+
 	logger := device.NewLogger(device.LogLevelVerbose, "wireguard: ")
+	localAddr := &net.UDPAddr{IP: net.IPv4zero, Port: u.config.ListenPort}
 
 	// Spawn new virtual device that will handle packets in userspace
-	tunDevice := device.NewDevice(tun, NewUDPBind(conn), logger)
+	tunDevice := device.NewDevice(tun, NewUDPBind(conn, localAddr, u.logger), logger)
 
 	//
 	remotePubKey, err := wgtypes.ParseKey(remotePeer.PublicKey)
@@ -90,22 +95,30 @@ func (u *userspaceWGTunnel) Start(ctx context.Context, conn *net.UDPConn, remote
 		return fmt.Errorf("failed to convert wgtypes.Config to UAPI: %w", err)
 	}
 
+	u.logger.Info("Creating uapi configuration", "config", uapiConfig)
+
 	// Pass the configuration to the device via IPC
 	if errIpc := tunDevice.IpcSetOperation(strings.NewReader(uapiConfig)); errIpc != nil {
+		tunDevice.Close()
+		conn.Close()
 		return fmt.Errorf("failed to set IPC operation: %w", errIpc)
 	}
 
 	// Bring up the TUN device
 	if errDevice := tunDevice.Up(); errDevice != nil {
 		tunDevice.Close()
+		conn.Close()
 		return fmt.Errorf("failed to bring up TUN device: %w", errDevice)
 	}
 
-	// todo: rethink
-	go func() {
-		<-ctx.Done()
+	if errHandshake := u.waitForHandshake(ctx, tunDevice, remotePeer.PublicKey); errHandshake != nil {
 		tunDevice.Close()
-	}()
+		conn.Close()
+		return fmt.Errorf("handshake did not complete: %w", errHandshake)
+	}
+
+	u.tunDevice = tunDevice
+	u.conn = conn
 
 	return nil
 }
@@ -115,39 +128,25 @@ func (u *userspaceWGTunnel) ListenPort() int {
 }
 
 func (u *userspaceWGTunnel) PublicKey() string {
-	return ""
+	return u.privKey.PublicKey().String()
 }
 
 func (u *userspaceWGTunnel) Stop() error {
+	// todo(): handle errors and cleanup
+	u.tunDevice.Close()
+	// todo(): this might be nil (might be already closed via wireguard-go)
+	u.conn.Close()
 	return nil
 }
 
 func (u *userspaceWGTunnel) ensureTunInterfaceExists(iface string) (tun.Device, error) {
-	// Check if the interface exists
-	link, err := netlink.LinkByName(iface)
-	if err == nil {
-		// Interface exists, make sure it's a TUN device
-		if link.Type() != TUNDeviceType {
-			return nil, fmt.Errorf("interface %q exists but is not a TUN device (type %q)", iface, link.Type())
-		}
-
-		u.logger.Info("Interface already exists", "iface", iface)
-
-		// If it already exists, we will "simulate" creating it given that there is no OpenTUN method
-		// todo(): improve to make it more clear
-		tunDev, errTun := tun.CreateTUN(iface, DefaultNetMTU)
-		if errTun != nil {
-			return nil, fmt.Errorf("failed to create TUN interface %q: %w", iface, errTun)
-		}
-
-		return tunDev, nil // Already there (you might want to open it if needed)
+	// Try to delete the existing interface (optional safety)
+	if link, err := netlink.LinkByName(iface); err == nil {
+		u.logger.Info("Deleting pre-existing interface", "iface", iface)
+		_ = netlink.LinkDel(link) // ignore error — best effort
 	}
 
-	if _, ok := err.(netlink.LinkNotFoundError); !ok {
-		return nil, fmt.Errorf("error checking interface %q: %w", iface, err)
-	}
-
-	// Interface truly missing, create it using TUN
+	// Now create it cleanly
 	tunDev, err := tun.CreateTUN(iface, DefaultNetMTU)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TUN interface %q: %w", iface, err)
@@ -155,4 +154,45 @@ func (u *userspaceWGTunnel) ensureTunInterfaceExists(iface string) (tun.Device, 
 
 	u.logger.Info("Created TUN interface", "iface", iface)
 	return tunDev, nil
+}
+
+// waitForHandshake waits for the handshake to complete with the given public key
+func (u *userspaceWGTunnel) waitForHandshake(ctx context.Context, dev *device.Device, peerPubKey string) error {
+	// todo(): this polling interval should be configurable
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("context canceled or timed out while waiting for handshake: %w", ctx.Err())
+
+		case <-ticker.C:
+			var buf strings.Builder
+			if err := dev.IpcGetOperation(&buf); err != nil {
+				return fmt.Errorf("failed to get device status: %w", err)
+			}
+
+			if hasHandshakeOccurred(buf.String(), peerPubKey) {
+				return nil
+			}
+		}
+	}
+}
+
+// hasHandshakeOccurred checks if the handshake has occurred with the given public key
+func hasHandshakeOccurred(status, pubKey string) bool {
+	lines := strings.Split(status, "\n")
+	found := false
+	for _, line := range lines {
+		if strings.HasPrefix(line, "public_key=") && strings.HasSuffix(line, pubKey) {
+			found = true
+		}
+		if found && strings.HasPrefix(line, "last_handshake_time_sec=") {
+			if !strings.HasSuffix(line, "=0") {
+				return true
+			}
+		}
+	}
+	return false
 }

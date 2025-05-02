@@ -32,7 +32,7 @@ func NewUDPBind(conn *net.UDPConn, addr *net.UDPAddr, logger logr.Logger) *UDPBi
 // Open returns a ReceiveFunc slice for reading packets and reports the bound port.
 // Since the UDP connection is pre-established, no new binding is performed (port is ignored).
 func (b *UDPBind) Open(_ uint16) (fns []conn.ReceiveFunc, actualPort uint16, err error) {
-	b.logger.Info("bind: Open called on existing UDP connection", "localAddr", b.conn.LocalAddr().String())
+	b.logger.Info("bind: Open called on existing UDP connection")
 
 	// If the connection is nil or closed, we need to recreate it
 	if b.conn == nil {
@@ -75,7 +75,7 @@ func (b *UDPBind) Open(_ uint16) (fns []conn.ReceiveFunc, actualPort uint16, err
 
 // Close closes the underlying UDP connection.
 func (b *UDPBind) Close() error {
-	b.logger.Info("bind: Close called on existing UDP connection", "localAddr", b.conn.LocalAddr().String())
+	b.logger.Info("bind: Close called on existing UDP connection")
 	if b.conn == nil {
 		return nil
 	}

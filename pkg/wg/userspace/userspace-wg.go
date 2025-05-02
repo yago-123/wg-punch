@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"net"
+	"os"
 	"strings"
 	"time"
 
@@ -63,14 +64,12 @@ func (u *userspaceWGTunnel) Start(ctx context.Context, conn *net.UDPConn, remote
 	}
 
 	// Create logger for the WireGuard device todo(): this needs rethinking
-
 	logger := device.NewLogger(device.LogLevelVerbose, "wireguard: ")
 	localAddr := &net.UDPAddr{IP: net.IPv4zero, Port: u.config.ListenPort}
 
 	// Spawn new virtual device that will handle packets in userspace
 	tunDevice := device.NewDevice(tun, NewUDPBind(conn, localAddr, u.logger), logger)
 
-	//
 	remotePubKey, err := wgtypes.ParseKey(remotePeer.PublicKey)
 	if err != nil {
 		return fmt.Errorf("invalid remote public key: %w", err)
@@ -97,23 +96,30 @@ func (u *userspaceWGTunnel) Start(ctx context.Context, conn *net.UDPConn, remote
 
 	u.logger.Info("Creating uapi configuration", "config", uapiConfig)
 
-	// Pass the configuration to the device via IPC
+	if err = u.assignAddressToIface(u.config.Iface, u.config.IfaceIPv4CIDR); err != nil {
+		cleanup(tunDevice, conn)
+		return fmt.Errorf("failed to assign address to interface %s: %w", u.config.Iface, err)
+	}
+
+	if err = u.addPeerRoutes(u.config.Iface, remotePeer.AllowedIPs); err != nil {
+		cleanup(tunDevice, conn)
+		return fmt.Errorf("failed to add peer routes to interface %s: %w", u.config.Iface, err)
+	}
+
+	//Pass the configuration to the device via IPC
 	if errIpc := tunDevice.IpcSetOperation(strings.NewReader(uapiConfig)); errIpc != nil {
-		tunDevice.Close()
-		conn.Close()
+		cleanup(tunDevice, conn)
 		return fmt.Errorf("failed to set IPC operation: %w", errIpc)
 	}
 
 	// Bring up the TUN device
 	if errDevice := tunDevice.Up(); errDevice != nil {
-		tunDevice.Close()
-		conn.Close()
+		cleanup(tunDevice, conn)
 		return fmt.Errorf("failed to bring up TUN device: %w", errDevice)
 	}
 
 	if errHandshake := u.waitForHandshake(ctx, tunDevice, remotePeer.PublicKey); errHandshake != nil {
-		tunDevice.Close()
-		conn.Close()
+		cleanup(tunDevice, conn)
 		return fmt.Errorf("handshake did not complete: %w", errHandshake)
 	}
 
@@ -121,6 +127,16 @@ func (u *userspaceWGTunnel) Start(ctx context.Context, conn *net.UDPConn, remote
 	u.conn = conn
 
 	return nil
+}
+
+// TODO(): TEMPORARY FUNCTION, come up with a more elegant solution
+func cleanup(dev *device.Device, conn *net.UDPConn) {
+	if dev != nil {
+		dev.Close()
+	}
+	if conn != nil {
+		conn.Close()
+	}
 }
 
 func (u *userspaceWGTunnel) ListenPort() int {
@@ -136,25 +152,112 @@ func (u *userspaceWGTunnel) Stop() error {
 	u.tunDevice.Close()
 	// todo(): this might be nil (might be already closed via wireguard-go)
 	u.conn.Close()
+
+	// todo(): handle iface link deletion
 	return nil
 }
 
 func (u *userspaceWGTunnel) ensureTunInterfaceExists(iface string) (tun.Device, error) {
+	// if !u.config.CreateIface {
+	// 	return nil, fmt.Errorf("TUN interface creation is disabled")
+	// }
+
 	// Try to delete the existing interface (optional safety)
-	if link, err := netlink.LinkByName(iface); err == nil {
+	// todo(): this is like this just for testing, remove it later
+	link, err := netlink.LinkByName(iface)
+	if err == nil {
 		u.logger.Info("Deleting pre-existing interface", "iface", iface)
 		_ = netlink.LinkDel(link) // ignore error — best effort
+	}
+
+	// Only proceed if the interface is truly missing
+	// todo(): improve error handling
+	if !strings.Contains(err.Error(), "Link not found") {
+		return nil, fmt.Errorf("error checking interface %s: %w", iface, err)
 	}
 
 	// Now create it cleanly
 	tunDev, err := tun.CreateTUN(iface, DefaultNetMTU)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create TUN interface %q: %w", iface, err)
+		return nil, fmt.Errorf("failed to create TUN interface %s: %w", iface, err)
+	}
+
+	link, err = netlink.LinkByName(iface)
+	if err != nil {
+		return nil, fmt.Errorf("failed to lookup interface %s: %w", iface, err)
+	}
+
+	// Set the interface up
+	if errSetup := netlink.LinkSetUp(link); errSetup != nil {
+		return nil, fmt.Errorf("failed to bring interface %s up: %w", iface, errSetup)
 	}
 
 	u.logger.Info("Created TUN interface", "iface", iface)
 	return tunDev, nil
 }
+
+// assignAddressToIface assigns the internal IP address to the WireGuard interface in CIDR notation in order to allow
+// communications between peers
+// todo(): unify with the kernel impl. (maybe move to util package instead?)
+func (u *userspaceWGTunnel) assignAddressToIface(iface, addrCIDR string) error {
+	// Lookup interface link by name
+	link, err := netlink.LinkByName(iface)
+	if err != nil {
+		return fmt.Errorf("failed to get link %s: %w", iface, err)
+	}
+
+	// Parse address CIDR to assign to the interface
+	addr, err := netlink.ParseAddr(addrCIDR)
+	if err != nil {
+		return fmt.Errorf("failed to parse address %s: %w", addrCIDR, err)
+	}
+
+	// todo(): move this into a separate function
+	// Check if the address already exists on the interface
+	existingAddrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
+	if err != nil {
+		return fmt.Errorf("failed to list addresses on %s: %w", iface, err)
+	}
+
+	for _, a := range existingAddrs {
+		if a.IP.Equal(addr.IP) && a.Mask.String() == addr.Mask.String() {
+			return nil // already exists, don't reassign
+		}
+	}
+
+	// Assign address to the interface
+	if errAddr := netlink.AddrAdd(link, addr); errAddr != nil {
+		return fmt.Errorf("failed to assign address: %w", errAddr)
+	}
+
+	return nil
+}
+
+// addPeerRoutes adds the allowed IPs of the peer to the WireGuard interface so that the kernel can route packets
+// todo(): unify with the kernel impl. (maybe move to util package instead?)
+func (u *userspaceWGTunnel) addPeerRoutes(iface string, allowedIPs []net.IPNet) error {
+	link, err := netlink.LinkByName(iface)
+	if err != nil {
+		return fmt.Errorf("failed to get link %q: %w", iface, err)
+	}
+
+	for _, ipNet := range allowedIPs {
+		route := &netlink.Route{
+			LinkIndex: link.Attrs().Index,
+			Dst:       &ipNet,
+		}
+
+		// Try to add the route, but don't fail if it already exists
+		if errRoute := netlink.RouteAdd(route); errRoute != nil && !os.IsExist(errRoute) {
+			return fmt.Errorf("failed to add route %s: %w", ipNet.String(), errRoute)
+		}
+	}
+
+	return nil
+}
+
+// assignAddressToIface
+// addPeerRoutes
 
 // waitForHandshake waits for the handshake to complete with the given public key
 func (u *userspaceWGTunnel) waitForHandshake(ctx context.Context, dev *device.Device, peerPubKey string) error {

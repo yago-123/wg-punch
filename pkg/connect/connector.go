@@ -96,7 +96,7 @@ func (c *Connector) Connect(ctx context.Context, tunnel wg.Tunnel, allowedIPs []
 		Endpoint:   endpoint,
 		AllowedIPs: remoteAllowedIPs,
 	}); errTunnel != nil {
-		return nil, errors.Wrap(errors.ErrTunnelStart, err)
+		return nil, errors.Wrap(errors.ErrTunnelStart, errTunnel)
 	}
 
 	// Return net.Conn (use the raw conn or wrap it)

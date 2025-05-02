@@ -45,6 +45,8 @@ github.com/vishvananda/netns v0.0.4 h1:Oeaw1EM2JMxD51g9uhtC0D7erkIjgmj8+JZc26m1Y
 github.com/vishvananda/netns v0.0.4/go.mod h1:SpkAiCQRtJ6TvvxPnOSyH3BMl6unz3xZlaprSwhNNJM=
 github.com/yago-123/peer-hub v0.0.0-20250424153946-19fd6d2b7af2 h1:T7iY8rYDVHorcc3WTYjqbt3gHbs8FB5pZvO0HNR2yaY=
 github.com/yago-123/peer-hub v0.0.0-20250424153946-19fd6d2b7af2/go.mod h1:bgp0bP0TbFTdc/S997/etFT3VjdCSUuuCv6+sQq3WwA=
+github.com/yago-123/wg-punch-kernel v0.0.0-20250427113806-1f5616ef3a5f h1:j7yZYVLn4r6H5TZ703QJXuhP5QVxcj3pf6XC/Uz6uGQ=
+github.com/yago-123/wg-punch-kernel v0.0.0-20250427113806-1f5616ef3a5f/go.mod h1:QAYCKLgs+xd/lza1Y9fC9ZKiftiG45tvi02eGnmFUSc=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20210921155107-089bfa567519/go.mod h1:GvvjBRRGRdwPK5ydBHafDWAxML/pGHZbMvKqRZ5+Abc=

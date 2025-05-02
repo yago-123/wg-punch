@@ -14,7 +14,7 @@ import (
 
 	"github.com/go-logr/logr"
 
-	kernelwg "github.com/yago-123/wg-punch/pkg/wg/kernel"
+	kernelwg "github.com/yago-123/wg-punch-kernel/kernel"
 
 	"github.com/yago-123/wg-punch/pkg/connect"
 	"github.com/yago-123/wg-punch/pkg/wg"
@@ -28,8 +28,8 @@ const (
 	TunnelHandshakeTimeout = 30 * time.Second
 	RendezvousServer       = "http://rendezvous.yago.ninja:7777"
 
-	LocalPeerID  = "o2"
-	RemotePeerID = "o1"
+	LocalPeerID  = "kk2"
+	RemotePeerID = "kk1"
 
 	WGLocalListenPort    = 51822
 	WGLocalIfaceName     = "wg2"

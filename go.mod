@@ -1,6 +1,6 @@
 module github.com/yago-123/wg-punch
 
-go 1.24.1
+go 1.24.2
 
 require (
 	github.com/go-logr/logr v1.4.2
@@ -8,6 +8,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/vishvananda/netlink v1.3.0
 	github.com/yago-123/peer-hub v0.0.0-20250424153946-19fd6d2b7af2
+	github.com/yago-123/wg-punch-kernel v0.0.0-20250427113806-1f5616ef3a5f
 	golang.zx2c4.com/wireguard v0.0.0-20231211153847-12269c276173
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20241231184526-a9ab2273dd10
 )

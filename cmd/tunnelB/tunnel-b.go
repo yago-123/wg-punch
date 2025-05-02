@@ -13,7 +13,7 @@ import (
 
 	"github.com/yago-123/wg-punch/pkg/util"
 
-	kernelwg "github.com/yago-123/wg-punch/pkg/wg/kernel"
+	kernelwg "github.com/yago-123/wg-punch-kernel/kernel"
 
 	"github.com/sirupsen/logrus"
 

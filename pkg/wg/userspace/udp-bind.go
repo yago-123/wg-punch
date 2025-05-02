@@ -2,6 +2,9 @@ package userspacewg
 
 import (
 	"errors"
+	"github.com/go-logr/logr"
+	"github.com/yago-123/peer-hub/pkg/common"
+
 	"net"
 
 	"golang.zx2c4.com/wireguard/conn"
@@ -11,27 +14,45 @@ type ReceiveFunc func(bufs [][]byte, eps []UDPEndpoint) (n int, err error)
 
 // UDPBind implements conn.Bind for a single pre-established UDP socket.
 type UDPBind struct {
-	conn *net.UDPConn
+	conn   *net.UDPConn
+	addr   *net.UDPAddr
+	logger logr.Logger
 }
 
 // NewUDPBind creates a new UDPBind using an existing UDP connection.
-func NewUDPBind(conn *net.UDPConn) *UDPBind {
-	return &UDPBind{conn: conn}
+func NewUDPBind(conn *net.UDPConn, addr *net.UDPAddr, logger logr.Logger) *UDPBind {
+	return &UDPBind{
+		conn:   conn,
+		addr:   addr,
+		logger: logger,
+	}
 }
 
+// todo(): this implementation is flawed. Connections must be reused, not recreated.
 // Open returns a ReceiveFunc slice for reading packets and reports the bound port.
 // Since the UDP connection is pre-established, no new binding is performed (port is ignored).
 func (b *UDPBind) Open(_ uint16) (fns []conn.ReceiveFunc, actualPort uint16, err error) {
-	// Retrieve local addr from the UDP conn
+	b.logger.Info("bind: Open called on existing UDP connection", "localAddr", b.conn.LocalAddr().String())
+
+	// If the connection is nil or closed, we need to recreate it
+	if b.conn == nil {
+		// Recreate the connection
+		conn, errListen := net.ListenUDP(common.UDPProtocol, b.addr)
+		if errListen != nil {
+			return nil, 0, errListen
+		}
+		b.conn = conn
+	}
+
 	localAddr, ok := b.conn.LocalAddr().(*net.UDPAddr)
 	if !ok {
 		return nil, 0, errors.New("invalid local address type")
 	}
 
-	// Define function for receiving packets. This func receives batch of packet, fills buffer with incoming data
-	// record how many bytes were read and capture sender address into endpoint type
+	// Define function for receiving packets. This func receives batches of packets. Fills buffer with incoming data
+	// record how many bytes were read and capture sender address into endpoint type.
 	recvFn := func(bufs [][]byte, sizes []int, eps []conn.Endpoint) (n int, err error) {
-		// Check if the buffers, sizes, and endpoints are valid
+		// Check if the buffers, sizes, and endpoints slices are valid
 		if len(bufs) == 0 || len(sizes) == 0 || len(eps) == 0 {
 			return 0, nil
 		}
@@ -44,11 +65,8 @@ func (b *UDPBind) Open(_ uint16) (fns []conn.ReceiveFunc, actualPort uint16, err
 
 		// Fill the first endpoint with source address
 		eps[0] = &UDPEndpoint{addr: addr}
-
-		// Resize the buffer to the actual read size and record the size
 		bufs[0] = bufs[0][:nRead]
 		sizes[0] = nRead
-
 		return 1, nil
 	}
 
@@ -57,12 +75,18 @@ func (b *UDPBind) Open(_ uint16) (fns []conn.ReceiveFunc, actualPort uint16, err
 
 // Close closes the underlying UDP connection.
 func (b *UDPBind) Close() error {
-	return b.conn.Close()
+	b.logger.Info("bind: Close called on existing UDP connection", "localAddr", b.conn.LocalAddr().String())
+	if b.conn == nil {
+		return nil
+	}
+	err := b.conn.Close()
+	b.conn = nil
+	return err
 }
 
 // SetMark sets the SO_MARK option on the socket.
 // This is a no-op in this implementation because net.UDPConn does not expose setting socket options.
-func (b *UDPBind) SetMark(mark uint32) error {
+func (b *UDPBind) SetMark(_ uint32) error {
 	// Implementing SO_MARK would require access to syscall.RawConn
 	// and manipulating the file descriptor manually.
 	return nil

@@ -2,12 +2,14 @@ package userspacewg
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"net"
 	"os"
 	"strings"
 	"time"
+
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/go-logr/logr"
 	"github.com/vishvananda/netlink"
@@ -118,7 +120,8 @@ func (u *userspaceWGTunnel) Start(ctx context.Context, conn *net.UDPConn, remote
 		return fmt.Errorf("failed to bring up TUN device: %w", errDevice)
 	}
 
-	if errHandshake := u.waitForHandshake(ctx, tunDevice, remotePeer.PublicKey); errHandshake != nil {
+	// todo(): handle the hex encoding of the public key better
+	if errHandshake := u.waitForHandshake(ctx, tunDevice, hex.EncodeToString(remotePubKey[:])); errHandshake != nil {
 		cleanup(tunDevice, conn)
 		return fmt.Errorf("handshake did not complete: %w", errHandshake)
 	}
@@ -255,9 +258,6 @@ func (u *userspaceWGTunnel) addPeerRoutes(iface string, allowedIPs []net.IPNet) 
 
 	return nil
 }
-
-// assignAddressToIface
-// addPeerRoutes
 
 // waitForHandshake waits for the handshake to complete with the given public key
 func (u *userspaceWGTunnel) waitForHandshake(ctx context.Context, dev *device.Device, peerPubKey string) error {

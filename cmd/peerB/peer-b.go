@@ -102,7 +102,7 @@ func main() {
 	}
 
 	// todo(): think about where to put the cancel of the tunnel itself
-	defer tunnel.Stop()
+	defer tunnel.Stop(context.Background())
 	defer netConn.Close()
 
 	logger.Info("Tunnel has been stablished! Press Ctrl+C to exit.")

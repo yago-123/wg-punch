@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
-	"os"
 	"strings"
 	"time"
 
@@ -13,8 +12,10 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/vishvananda/netlink"
+
 	"github.com/yago-123/wg-punch/pkg/peer"
 	"github.com/yago-123/wg-punch/pkg/tunnel"
+	tunnelUtil "github.com/yago-123/wg-punch/pkg/tunnel/util"
 	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/tun"
 )
@@ -101,12 +102,12 @@ func (u *userspaceWGTunnel) Start(ctx context.Context, conn *net.UDPConn, remote
 
 	u.logger.Info("Creating uapi configuration", "config", uapiConfig)
 
-	if err = u.assignAddressToIface(u.config.Iface, u.config.IfaceIPv4CIDR); err != nil {
+	if err = tunnelUtil.AssignAddressToIface(u.config.Iface, u.config.IfaceIPv4CIDR); err != nil {
 		cleanup(tunDevice, conn)
 		return fmt.Errorf("failed to assign address to interface %s: %w", u.config.Iface, err)
 	}
 
-	if err = u.addPeerRoutes(u.config.Iface, remotePeer.AllowedIPs); err != nil {
+	if err = tunnelUtil.AddPeerRoutes(u.config.Iface, remotePeer.AllowedIPs); err != nil {
 		cleanup(tunDevice, conn)
 		return fmt.Errorf("failed to add peer routes to interface %s: %w", u.config.Iface, err)
 	}
@@ -153,7 +154,7 @@ func (u *userspaceWGTunnel) PublicKey() string {
 	return u.privKey.PublicKey().String()
 }
 
-func (u *userspaceWGTunnel) Stop() error {
+func (u *userspaceWGTunnel) Stop(ctx context.Context) error {
 	// todo(): handle errors and cleanup
 	u.tunDevice.Close()
 	// todo(): this might be nil (might be already closed via wireguard-go)
@@ -200,66 +201,6 @@ func (u *userspaceWGTunnel) ensureTunInterfaceExists(iface string) (tun.Device, 
 
 	u.logger.Info("Created TUN interface", "iface", iface)
 	return tunDev, nil
-}
-
-// assignAddressToIface assigns the internal IP address to the WireGuard interface in CIDR notation in order to allow
-// communications between peers
-// todo(): unify with the kernel impl. (maybe move to util package instead?)
-func (u *userspaceWGTunnel) assignAddressToIface(iface, addrCIDR string) error {
-	// Lookup interface link by name
-	link, err := netlink.LinkByName(iface)
-	if err != nil {
-		return fmt.Errorf("failed to get link %s: %w", iface, err)
-	}
-
-	// Parse address CIDR to assign to the interface
-	addr, err := netlink.ParseAddr(addrCIDR)
-	if err != nil {
-		return fmt.Errorf("failed to parse address %s: %w", addrCIDR, err)
-	}
-
-	// todo(): move this into a separate function
-	// Check if the address already exists on the interface
-	existingAddrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
-	if err != nil {
-		return fmt.Errorf("failed to list addresses on %s: %w", iface, err)
-	}
-
-	for _, a := range existingAddrs {
-		if a.IP.Equal(addr.IP) && a.Mask.String() == addr.Mask.String() {
-			return nil // already exists, don't reassign
-		}
-	}
-
-	// Assign address to the interface
-	if errAddr := netlink.AddrAdd(link, addr); errAddr != nil {
-		return fmt.Errorf("failed to assign address: %w", errAddr)
-	}
-
-	return nil
-}
-
-// addPeerRoutes adds the allowed IPs of the peer to the WireGuard interface so that the kernel can route packets
-// todo(): unify with the kernel impl. (maybe move to util package instead?)
-func (u *userspaceWGTunnel) addPeerRoutes(iface string, allowedIPs []net.IPNet) error {
-	link, err := netlink.LinkByName(iface)
-	if err != nil {
-		return fmt.Errorf("failed to get link %q: %w", iface, err)
-	}
-
-	for _, ipNet := range allowedIPs {
-		route := &netlink.Route{
-			LinkIndex: link.Attrs().Index,
-			Dst:       &ipNet,
-		}
-
-		// Try to add the route, but don't fail if it already exists
-		if errRoute := netlink.RouteAdd(route); errRoute != nil && !os.IsExist(errRoute) {
-			return fmt.Errorf("failed to add route %s: %w", ipNet.String(), errRoute)
-		}
-	}
-
-	return nil
 }
 
 // waitForHandshake waits for the handshake to complete with the given public key

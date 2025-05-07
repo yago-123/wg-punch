@@ -12,7 +12,7 @@ type Tunnel interface {
 	Start(ctx context.Context, conn *net.UDPConn, peer peer.Info, cancelPunch context.CancelFunc) error
 	PublicKey() string
 	ListenPort() int
-	Stop() error
+	Stop(ctx context.Context) error
 }
 
 type Config struct {

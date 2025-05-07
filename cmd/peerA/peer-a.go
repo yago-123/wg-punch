@@ -8,15 +8,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/yago-123/wg-punch/cmd/common"
-
-	"github.com/yago-123/wg-punch/pkg/puncher"
-
 	"github.com/go-logr/logr"
-	kernelwg "github.com/yago-123/wg-punch-kernel/kernel"
 
+	"github.com/yago-123/wg-punch/cmd/common"
 	"github.com/yago-123/wg-punch/pkg/connect"
+	"github.com/yago-123/wg-punch/pkg/puncher"
 	"github.com/yago-123/wg-punch/pkg/tunnel"
+	wguserspace "github.com/yago-123/wg-punch/pkg/tunnel/wg-userspace"
 )
 
 const (
@@ -90,7 +88,7 @@ func main() {
 	}
 
 	// Initialize WireGuard interface using WireGuard
-	tunnel, err := kernelwg.NewTunnel(tunnelCfg)
+	tunnel, err := wguserspace.New(tunnelCfg, logger)
 	if err != nil {
 		logger.Error(err, "failed to create tunnel", "localPeer", LocalPeerID)
 		return

@@ -9,15 +9,12 @@ import (
 	"time"
 
 	"github.com/yago-123/wg-punch/cmd/common"
-
+	"github.com/yago-123/wg-punch/pkg/connect"
 	"github.com/yago-123/wg-punch/pkg/puncher"
+	"github.com/yago-123/wg-punch/pkg/tunnel"
+	wguserspace "github.com/yago-123/wg-punch/pkg/tunnel/wg-userspace"
 
 	"github.com/go-logr/logr"
-
-	kernelwg "github.com/yago-123/wg-punch-kernel/kernel"
-
-	"github.com/yago-123/wg-punch/pkg/connect"
-	"github.com/yago-123/wg-punch/pkg/tunnel"
 )
 
 const (
@@ -91,7 +88,7 @@ func main() {
 	}
 
 	// Initialize WireGuard interface using WireGuard
-	tunnel, err := kernelwg.NewTunnel(tunnelCfg)
+	tunnel, err := wguserspace.New(tunnelCfg, logger)
 	if err != nil {
 		logger.Error(err, "failed to create tunnel", "localPeer", LocalPeerID)
 		return
@@ -120,7 +117,6 @@ func main() {
 	tcpServer.Start()
 	defer tcpServer.Close()
 
-	// todo(): move to HTTP server
 	// Start TCP client after a delay to ensure server is ready
 	time.Sleep(DelayClientStart)
 
@@ -135,7 +131,7 @@ func main() {
 	go func() {
 		for {
 			tcpClient.Send("hello via TCP over WireGuard")
-			time.Sleep(DelayClientStart)
+			time.Sleep(3 * time.Second)
 		}
 	}()
 

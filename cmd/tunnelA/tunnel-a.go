@@ -17,7 +17,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/yago-123/wg-punch/pkg/peer"
-	"github.com/yago-123/wg-punch/pkg/wg"
+	"github.com/yago-123/wg-punch/pkg/tunnel"
 )
 
 const (
@@ -59,7 +59,7 @@ func main() {
 	defer cancel()
 
 	// Configure the tunnel
-	tunnelCfg := &wg.TunnelConfig{
+	tunnelCfg := &tunnel.Config{
 		PrivKey:           WGPrivKey,
 		Iface:             WGLocalIfaceName,
 		IfaceIPv4CIDR:     WGLocalIfaceAddrCIDR,

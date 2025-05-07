@@ -13,8 +13,8 @@ import (
 	"github.com/yago-123/peer-hub/pkg/client"
 	"github.com/yago-123/wg-punch/pkg/peer"
 	"github.com/yago-123/wg-punch/pkg/puncher"
+	"github.com/yago-123/wg-punch/pkg/tunnel"
 	"github.com/yago-123/wg-punch/pkg/util"
-	"github.com/yago-123/wg-punch/pkg/wg"
 )
 
 type Connector struct {
@@ -43,7 +43,7 @@ func NewConnector(localPeerID string, puncher puncher.Puncher, opts ...Option) *
 }
 
 // Connect handles the connection process between two peers. From registering the peer until the handshake is done.
-func (c *Connector) Connect(ctx context.Context, tunnel wg.Tunnel, allowedIPs []string, remotePeerID string) (net.Conn, error) {
+func (c *Connector) Connect(ctx context.Context, tunnel tunnel.Tunnel, allowedIPs []string, remotePeerID string) (net.Conn, error) {
 	localAddr := &net.UDPAddr{IP: net.IPv4zero, Port: tunnel.ListenPort()}
 
 	conn, err := net.ListenUDP(util.UDPProtocol, localAddr)
@@ -90,15 +90,12 @@ func (c *Connector) Connect(ctx context.Context, tunnel wg.Tunnel, allowedIPs []
 
 	c.logger.Info("Connecting to remote peer", "peerID", remotePeerID, "endpoint", endpoint.String(), "allowedIPs", remoteAllowedIPs)
 
-	// todo(): pass this argument to the tunnel so that it can be triggered RIGHT BEFORE the connection takeover
-	cancelPunch()
-
 	// Start WireGuard tunnel
 	if errTunnel := tunnel.Start(ctx, conn, peer.Info{
 		PublicKey:  remotePeerInfo.PublicKey,
 		Endpoint:   endpoint,
 		AllowedIPs: remoteAllowedIPs,
-	}); errTunnel != nil {
+	}, cancelPunch); errTunnel != nil {
 		return nil, errors.Wrap(errors.ErrTunnelStart, errTunnel)
 	}
 

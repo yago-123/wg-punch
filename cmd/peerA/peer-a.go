@@ -16,7 +16,7 @@ import (
 	kernelwg "github.com/yago-123/wg-punch-kernel/kernel"
 
 	"github.com/yago-123/wg-punch/pkg/connect"
-	"github.com/yago-123/wg-punch/pkg/wg"
+	"github.com/yago-123/wg-punch/pkg/tunnel"
 )
 
 const (
@@ -79,7 +79,7 @@ func main() {
 	ctxHandshake, cancel := context.WithTimeout(context.Background(), TunnelHandshakeTimeout)
 	defer cancel()
 
-	tunnelCfg := &wg.TunnelConfig{
+	tunnelCfg := &tunnel.Config{
 		PrivKey:           WGLocalPrivKey,
 		Iface:             WGLocalIfaceName,
 		IfaceIPv4CIDR:     WGLocalIfaceAddrCIDR,

@@ -14,7 +14,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/vishvananda/netlink"
 	"github.com/yago-123/wg-punch/pkg/peer"
-	"github.com/yago-123/wg-punch/pkg/wg"
+	"github.com/yago-123/wg-punch/pkg/tunnel"
 	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/tun"
 )
@@ -36,7 +36,7 @@ const (
 */
 
 type userspaceWGTunnel struct {
-	config *wg.TunnelConfig
+	config *tunnel.Config
 
 	privKey wgtypes.Key
 
@@ -46,7 +46,7 @@ type userspaceWGTunnel struct {
 	logger logr.Logger
 }
 
-func New(cfg *wg.TunnelConfig, logger logr.Logger) (wg.Tunnel, error) {
+func New(cfg *tunnel.Config, logger logr.Logger) (tunnel.Tunnel, error) {
 	privKey, err := wgtypes.ParseKey(cfg.PrivKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse private key: %w", err)
@@ -59,7 +59,7 @@ func New(cfg *wg.TunnelConfig, logger logr.Logger) (wg.Tunnel, error) {
 	}, nil
 }
 
-func (u *userspaceWGTunnel) Start(ctx context.Context, conn *net.UDPConn, remotePeer peer.Info) error {
+func (u *userspaceWGTunnel) Start(ctx context.Context, conn *net.UDPConn, remotePeer peer.Info, cancelPunch context.CancelFunc) error {
 	tun, err := u.ensureTunInterfaceExists(u.config.Iface)
 	if err != nil {
 		return fmt.Errorf("failed to ensure TUN interface exists: %w", err)
@@ -68,6 +68,9 @@ func (u *userspaceWGTunnel) Start(ctx context.Context, conn *net.UDPConn, remote
 	// Create logger for the WireGuard device todo(): this needs rethinking
 	logger := device.NewLogger(device.LogLevelVerbose, "wireguard: ")
 	localAddr := &net.UDPAddr{IP: net.IPv4zero, Port: u.config.ListenPort}
+
+	// Cancel the punching process so that it doesn't interfere with the new connection
+	cancelPunch()
 
 	// Spawn new virtual device that will handle packets in userspace
 	tunDevice := device.NewDevice(tun, NewUDPBind(conn, localAddr, u.logger), logger)

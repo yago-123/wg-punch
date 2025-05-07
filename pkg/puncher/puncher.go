@@ -42,7 +42,7 @@ func NewPuncher(opts ...Option) Puncher {
 }
 
 // Punch attempts to establish a UDP connection with the remote peer by sending empty UDP packets. The return value is
-// a
+// a cancel function that must be called to stop the spawned punching process that happen in the background
 func (p *puncher) Punch(ctx context.Context, conn *net.UDPConn, remoteHint *net.UDPAddr) (context.CancelFunc, error) {
 	// If remoteHint is nil, return an error
 	if remoteHint == nil {

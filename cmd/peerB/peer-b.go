@@ -17,7 +17,7 @@ import (
 	kernelwg "github.com/yago-123/wg-punch-kernel/kernel"
 
 	"github.com/yago-123/wg-punch/pkg/connect"
-	"github.com/yago-123/wg-punch/pkg/wg"
+	"github.com/yago-123/wg-punch/pkg/tunnel"
 )
 
 const (
@@ -28,8 +28,8 @@ const (
 	TunnelHandshakeTimeout = 30 * time.Second
 	RendezvousServer       = "http://rendezvous.yago.ninja:7777"
 
-	LocalPeerID  = "kk2"
-	RemotePeerID = "kk1"
+	LocalPeerID  = "w2"
+	RemotePeerID = "w1"
 
 	WGLocalListenPort    = 51822
 	WGLocalIfaceName     = "wg2"
@@ -80,7 +80,7 @@ func main() {
 	ctxHandshake, cancel := context.WithTimeout(context.Background(), TunnelHandshakeTimeout)
 	defer cancel()
 
-	tunnelCfg := &wg.TunnelConfig{
+	tunnelCfg := &tunnel.Config{
 		PrivKey:           WGLocalPrivKey,
 		Iface:             WGLocalIfaceName,
 		IfaceIPv4CIDR:     WGLocalIfaceAddrCIDR,
@@ -120,6 +120,7 @@ func main() {
 	tcpServer.Start()
 	defer tcpServer.Close()
 
+	// todo(): move to HTTP server
 	// Start TCP client after a delay to ensure server is ready
 	time.Sleep(DelayClientStart)
 

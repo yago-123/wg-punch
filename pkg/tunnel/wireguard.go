@@ -1,4 +1,4 @@
-package wg
+package tunnel
 
 import (
 	"context"
@@ -9,13 +9,13 @@ import (
 )
 
 type Tunnel interface {
-	Start(ctx context.Context, conn *net.UDPConn, peer peer.Info) error
+	Start(ctx context.Context, conn *net.UDPConn, peer peer.Info, cancelPunch context.CancelFunc) error
 	PublicKey() string
 	ListenPort() int
 	Stop() error
 }
 
-type TunnelConfig struct {
+type Config struct {
 	PrivKey           string
 	Iface             string
 	IfaceIPv4CIDR     string

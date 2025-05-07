@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	userspacewg "github.com/yago-123/wg-punch/pkg/wg/userspace"
+	wguserspace "github.com/yago-123/wg-punch/pkg/tunnel/wg-userspace"
 
 	"github.com/yago-123/wg-punch/cmd/common"
 
@@ -16,7 +16,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/yago-123/wg-punch/pkg/connect"
-	"github.com/yago-123/wg-punch/pkg/wg"
+	"github.com/yago-123/wg-punch/pkg/tunnel"
 )
 
 const (
@@ -26,8 +26,8 @@ const (
 	TunnelHandshakeTimeout = 30 * time.Second
 	RendezvousServer       = "http://rendezvous.yago.ninja:7777"
 
-	LocalPeerID  = "kk1"
-	RemotePeerID = "kk2"
+	LocalPeerID  = "w1"
+	RemotePeerID = "w2"
 
 	WGLocalListenPort    = 51821
 	WGLocalIfaceName     = "wg1"
@@ -78,7 +78,7 @@ func main() {
 	ctxHandshake, cancel := context.WithTimeout(context.Background(), TunnelHandshakeTimeout)
 	defer cancel()
 
-	tunnelCfg := &wg.TunnelConfig{
+	tunnelCfg := &tunnel.Config{
 		PrivKey:           WGLocalPrivKey,
 		Iface:             WGLocalIfaceName,
 		IfaceIPv4CIDR:     WGLocalIfaceAddrCIDR,
@@ -89,7 +89,7 @@ func main() {
 	}
 
 	// Initialize WireGuard interface using WireGuard
-	tunnel, err := userspacewg.New(tunnelCfg, logger)
+	tunnel, err := wguserspace.New(tunnelCfg, logger)
 	if err != nil {
 		logger.Error(err, "failed to create tunnel", "localPeer", LocalPeerID)
 		return

@@ -38,12 +38,27 @@ const (
 func main() {
 	// ... 
 
-	ctx, cancel := context.WithTimeout(context.Background(), TunnelHandshakeTimeout)
+	puncherOptions := []puncher.Option{
+		puncher.WithPuncherInterval(300 * time.Millisecond),
+		puncher.WithSTUNServers(stunServers),
+		puncher.WithLogger(logger),
+	}
+	// Create a puncher with the STUN servers
+	p := puncher.NewPuncher(puncherOptions...)
+
+	connectorOptions := []connect.Option{
+		connect.WithRendezServer(RendezvousServer),
+		connect.WithWaitInterval(1 * time.Second),
+		connect.WithLogger(logger),
+	}
+	// Create a connector with the puncher
+	conn := connect.NewConnector(LocalPeerID, p, connectorOptions...)
+
+	ctxHandshake, cancel := context.WithTimeout(context.Background(), TunnelHandshakeTimeout)
 	defer cancel()
 
-	// Configure the tunnel
 	tunnelCfg := &tunnel.Config{
-		PrivKey:           WGPrivKey,
+		PrivKey:           WGLocalPrivKey,
 		Iface:             WGLocalIfaceName,
 		IfaceIPv4CIDR:     WGLocalIfaceAddrCIDR,
 		ListenPort:        WGLocalListenPort,
@@ -52,38 +67,23 @@ func main() {
 		KeepAliveInterval: WGKeepAliveInterval,
 	}
 
-	remoteIP, remoteIPCIDR, err := net.ParseCIDR(WGRemoteIfaceAddrCIDR)
+	// Initialize WireGuard interface using WireGuard
+	tunnel, err := wguserspace.New(tunnelCfg, logger)
 	if err != nil {
-		logger.Errorf("failed to parse CIDR: %v", err)
+		logger.Error(err, "failed to create tunnel", "localPeer", LocalPeerID)
 		return
 	}
 
-	// Create the remote peer
-	remotePeer := peer.Info{
-		PublicKey: WGRemotePubKey,
-		Endpoint: &net.UDPAddr{
-			IP:   net.ParseIP(WGRemotePubEndpointIP),
-			Port: WGRemoteListenPort,
-		},
-		AllowedIPs: []net.IPNet{
-			{
-				IP:   remoteIP,
-				Mask: remoteIPCIDR.Mask,
-			},
-		},
-	}
-
-	tunnel, err := kernelwg.NewTunnel(tunnelCfg)
+	// Connect to peer using a shared peer ID (both sides use same ID)
+	netConn, err := conn.Connect(ctxHandshake, tunnel, []string{WGLocalIfaceAddrCIDR}, RemotePeerID)
 	if err != nil {
-		logger.Errorf("failed to create tunnel: %v", err)
+		logger.Error(err, "failed to connect to peer", "localPeer", LocalPeerID, "remotePeerID", RemotePeerID)
 		return
 	}
 
-	if errStart := tunnel.Start(ctx, nil, remotePeer); errStart != nil {
-		logger.Errorf("failed to start tunnel: %v", errStart)
-		return
-	}
-	defer tunnel.Stop()
+	// todo(): think about where to put the cancel of the tunnel itself
+	defer tunnel.Stop(context.Background())
+	defer netConn.Close()
 
 	logger.Infof("Tunnel has been stablished! Press Ctrl+C to exit.")
 

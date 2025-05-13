@@ -43,6 +43,8 @@ func NewConnector(localPeerID string, puncher puncher.Puncher, opts ...Option) *
 }
 
 // Connect handles the connection process between two peers. From registering the peer until the handshake is done.
+// Once Connect has been called the inner connection and the tunnel are started and must be closed by the user of the
+// library in order to prevent resource leaks.
 func (c *Connector) Connect(ctx context.Context, tunnel tunnel.Tunnel, allowedIPs []string, remotePeerID string) (net.Conn, error) {
 	localAddr := &net.UDPAddr{IP: net.IPv4zero, Port: tunnel.ListenPort()}
 

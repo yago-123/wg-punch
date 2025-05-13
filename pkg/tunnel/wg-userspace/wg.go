@@ -16,6 +16,7 @@ import (
 	"github.com/yago-123/wg-punch/pkg/peer"
 	"github.com/yago-123/wg-punch/pkg/tunnel"
 	tunnelUtil "github.com/yago-123/wg-punch/pkg/tunnel/util"
+	
 	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/tun"
 )
@@ -37,13 +38,11 @@ const (
 */
 
 type userspaceWGTunnel struct {
-	config *tunnel.Config
-
-	privKey wgtypes.Key
-
+	privKey   wgtypes.Key
 	tunDevice *device.Device
 	conn      *net.UDPConn
 
+	config *tunnel.Config
 	logger logr.Logger
 }
 

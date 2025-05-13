@@ -1,9 +1,9 @@
 ![Alt text](https://github.com/user-attachments/assets/7225f4e0-e949-470a-b07f-a9c9a4a81530)
 
 ## About
-`wg-punch` is a library for seamless UDP hole punching using WireGuard, enabling **secure NAT traversal**. It operates with a 
-userspace TCP/IP stack, facilitating peer-to-peer communication by punching through NATs and firewalls over UDP, while 
-WireGuard establishes encrypted tunnels and overlay networks for private, secure connections.
+`wg-punch` is a library for seamless **NAT hole punching** via UDP and `WireGuard`. It operates with a userspace TCP/IP 
+stack, facilitating peer-to-peer communication by punching through NATs and firewalls over UDP, while WireGuard 
+establishes L3 encrypted tunnels and overlay networks for private, secure connections.
 
 ## Extension
 This library is designed to be customizable and extensible. It supports switching VPN tunnel implementations, allowing 

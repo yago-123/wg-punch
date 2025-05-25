@@ -49,9 +49,8 @@ func (p *puncher) Punch(ctx context.Context, conn *net.UDPConn, remoteHint *net.
 		return func() {}, fmt.Errorf("remote hint required for punching")
 	}
 
-	// todo(): adjust
 	if conn == nil {
-		return func() {}, fmt.Errorf("conn required for punching")
+		return func() {}, fmt.Errorf("UDP connection must be initialized in order to punch remote host")
 	}
 
 	p.logger.Info("punching remote host", "remoteHint", remoteHint.String())
@@ -72,13 +71,11 @@ func (p *puncher) Punch(ctx context.Context, conn *net.UDPConn, remoteHint *net.
 				return
 			case <-ticker.C:
 				_, errConn := conn.WriteToUDP([]byte(PunchMessage), remoteHint)
+
 				// The connection will be closed right before the WireGuard tunnel is started
 				if errors.Is(errConn, net.ErrClosed) {
 					return
 				}
-
-				// if errConn != nil {
-				// todo(): handle
 			}
 		}
 	}()
@@ -86,6 +83,8 @@ func (p *puncher) Punch(ctx context.Context, conn *net.UDPConn, remoteHint *net.
 	return cancelPunch, nil
 }
 
+// PublicAddr retrieves the public address of the local peer by using STUN servers. It is used to discover the public
+// IP and port of the local peer, which is necessary for establishing a connection with the remote peer
 func (p *puncher) PublicAddr(ctx context.Context, conn *net.UDPConn) (*net.UDPAddr, error) {
 	return util.GetPublicEndpoint(ctx, conn, p.stunServers)
 }

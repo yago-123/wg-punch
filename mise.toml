@@ -3,25 +3,3 @@ go = "1.24.2"
 golangci-lint = "1.64.5"
 "go:golang.org/x/tools/cmd/goimports" = "0.31.0"
 
-[env]
-GOTOOLCHAIN = "local"
-
-[tasks.all]
-description = "Run imports, formatting, and linting"
-run = [
-  "mise run imports",
-  "mise run fmt",
-  "mise run lint",
-]
-
-[tasks.lint]
-description = "Run golangci-lint"
-run = "golangci-lint run ./..."
-
-[tasks.imports]
-description = "Format imports"
-run = "find . -name \"*.go\" | xargs goimports -w"
-
-[tasks.fmt]
-description = "Format Go code"
-run = "go fmt ./..."

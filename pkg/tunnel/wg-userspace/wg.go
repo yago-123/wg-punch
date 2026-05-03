@@ -16,7 +16,7 @@ import (
 	"github.com/yago-123/wg-punch/pkg/peer"
 	"github.com/yago-123/wg-punch/pkg/tunnel"
 	tunnelUtil "github.com/yago-123/wg-punch/pkg/tunnel/util"
-	
+
 	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/tun"
 )

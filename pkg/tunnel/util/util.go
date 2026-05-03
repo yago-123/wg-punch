@@ -2,9 +2,10 @@ package util
 
 import (
 	"fmt"
-	"github.com/vishvananda/netlink"
 	"net"
 	"os"
+
+	"github.com/vishvananda/netlink"
 )
 
 // AssignAddressToIface assigns the internal IP address to the WireGuard interface in CIDR notation in order to allow

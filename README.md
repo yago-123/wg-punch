@@ -98,6 +98,16 @@ func main() {
 ```
 
 ## Quickstart
+Install development tools:
+```Bash
+$ mise install
+```
+
+Run local checks:
+```Bash
+$ mise run all
+```
+
 Start `peer-hub` server: 
 ```Bash
 $ 

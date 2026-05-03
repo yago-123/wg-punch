@@ -1,6 +1,6 @@
 module github.com/yago-123/wg-punch
 
-go 1.24.2
+go 1.26.2
 
 require (
 	github.com/go-logr/logr v1.4.2

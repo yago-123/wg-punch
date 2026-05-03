@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/yago-123/wg-punch/pkg/util"
 
 	kernelwg "github.com/yago-123/wg-punch-kernel/kernel"
@@ -91,17 +92,17 @@ func main() {
 		},
 	}
 
-	tunnel, err := kernelwg.NewTunnel(tunnelCfg)
+	tunnel, err := kernelwg.NewTunnel(tunnelCfg, logr.Discard())
 	if err != nil {
 		logger.Errorf("failed to create tunnel: %v", err)
 		return
 	}
 
-	if errStart := tunnel.Start(ctx, nil, remotePeer); errStart != nil {
+	if errStart := tunnel.Start(ctx, nil, remotePeer, func() {}); errStart != nil {
 		logger.Errorf("failed to start tunnel: %v", errStart)
 		return
 	}
-	defer tunnel.Stop()
+	defer tunnel.Stop(context.Background())
 
 	logger.Infof("Tunnel has been stablished! Press Ctrl+C to exit.")
 

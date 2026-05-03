@@ -1,15 +1,17 @@
 .PHONY: all
-all:
-	@mise run all
+all: imports fmt lint
 
 .PHONY: lint
 lint:
-	@mise run lint
+	@echo "Running linter..."
+	@golangci-lint run ./...
 
 .PHONY: imports
 imports:
-	@mise run imports
+	@echo "Running imports..."
+	@find . -name "*.go" | xargs goimports -w
 
 .PHONY: fmt
 fmt:
-	@mise run fmt
+	@echo "Running fmt..."
+	@go fmt ./...

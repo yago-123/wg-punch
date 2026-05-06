@@ -40,7 +40,9 @@ const (
 
 	WGKeepAliveInterval = 5 * time.Second
 
-	DelayClientStart = 5 * time.Second
+	DelayClientStart   = 5 * time.Second
+	ClientSendInterval = 3 * time.Second
+	PuncherInterval    = 300 * time.Millisecond
 )
 
 var stunServers = []string{
@@ -59,7 +61,7 @@ func main() {
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
 	puncherOptions := []puncher.Option{
-		puncher.WithPuncherInterval(300 * time.Millisecond),
+		puncher.WithPuncherInterval(PuncherInterval),
 		puncher.WithSTUNServers(stunServers),
 		puncher.WithLogger(logger),
 	}
@@ -102,7 +104,11 @@ func main() {
 	}
 
 	// todo(): think about where to put the cancel of the tunnel itself
-	defer tunnel.Stop(context.Background())
+	defer func() {
+		if errStop := tunnel.Stop(context.Background()); errStop != nil {
+			logger.Error(errStop, "failed to stop tunnel")
+		}
+	}()
 	defer netConn.Close()
 
 	logger.Info("Tunnel has been stablished! Press Ctrl+C to exit.")
@@ -131,7 +137,7 @@ func main() {
 	go func() {
 		for {
 			tcpClient.Send("hello via TCP over WireGuard")
-			time.Sleep(3 * time.Second)
+			time.Sleep(ClientSendInterval)
 		}
 	}()
 

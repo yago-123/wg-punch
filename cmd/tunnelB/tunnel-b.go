@@ -102,7 +102,11 @@ func main() {
 		logger.Errorf("failed to start tunnel: %v", errStart)
 		return
 	}
-	defer tunnel.Stop(context.Background())
+	defer func() {
+		if errStop := tunnel.Stop(context.Background()); errStop != nil {
+			logger.Errorf("failed to stop tunnel: %v", errStop)
+		}
+	}()
 
 	logger.Infof("Tunnel has been stablished! Press Ctrl+C to exit.")
 

@@ -2,9 +2,20 @@ package userspacewg
 
 import (
 	"encoding/binary"
+	"fmt"
 	"net"
 	"net/netip"
 )
+
+const udpPortByteLen = 2
+
+func udpPortToUint16(port int) (uint16, error) {
+	if port < 0 || port > int(^uint16(0)) {
+		return 0, fmt.Errorf("udp port out of range: %d", port)
+	}
+
+	return uint16(port), nil
+}
 
 // UDPEndpoint implements the conn.Endpoint interface for UDP connections.
 type UDPEndpoint struct {
@@ -33,8 +44,12 @@ func (ep *UDPEndpoint) DstToString() string {
 // DstToBytes converts the destination address to a byte slice.
 func (ep *UDPEndpoint) DstToBytes() []byte {
 	ip := ep.addr.IP.To16()
-	port := make([]byte, 2)
-	binary.BigEndian.PutUint16(port, uint16(ep.addr.Port))
+	port := make([]byte, udpPortByteLen)
+	portValue, err := udpPortToUint16(ep.addr.Port)
+	if err != nil {
+		return ip
+	}
+	binary.BigEndian.PutUint16(port, portValue)
 	return append(ip, port...)
 }
 

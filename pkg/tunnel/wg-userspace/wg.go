@@ -22,8 +22,9 @@ import (
 )
 
 const (
-	DefaultNetMTU = 1420
-	TUNDeviceType = "tun"
+	DefaultNetMTU         = 1420
+	TUNDeviceType         = "tun"
+	handshakePollInterval = 500 * time.Millisecond
 )
 
 /*
@@ -111,7 +112,7 @@ func (u *userspaceWGTunnel) Start(ctx context.Context, conn *net.UDPConn, remote
 		return fmt.Errorf("failed to add peer routes to interface %s: %w", u.config.Iface, err)
 	}
 
-	//Pass the configuration to the device via IPC
+	// Pass the configuration to the device via IPC
 	if errIpc := tunDevice.IpcSetOperation(strings.NewReader(uapiConfig)); errIpc != nil {
 		cleanup(tunDevice, conn)
 		return fmt.Errorf("failed to set IPC operation: %w", errIpc)
@@ -153,7 +154,7 @@ func (u *userspaceWGTunnel) PublicKey() string {
 	return u.privKey.PublicKey().String()
 }
 
-func (u *userspaceWGTunnel) Stop(ctx context.Context) error {
+func (u *userspaceWGTunnel) Stop(_ context.Context) error {
 	// todo(): handle errors and cleanup
 	u.tunDevice.Close()
 	// todo(): this might be nil (might be already closed via wireguard-go)
@@ -205,7 +206,7 @@ func (u *userspaceWGTunnel) ensureTunInterfaceExists(iface string) (tun.Device, 
 // waitForHandshake waits for the handshake to complete with the given public key
 func (u *userspaceWGTunnel) waitForHandshake(ctx context.Context, dev *device.Device, peerPubKey string) error {
 	// todo(): this polling interval should be configurable
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker := time.NewTicker(handshakePollInterval)
 	defer ticker.Stop()
 
 	for {

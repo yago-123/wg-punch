@@ -32,7 +32,7 @@ func NewUDPBind(conn *net.UDPConn, addr *net.UDPAddr, logger logr.Logger) *UDPBi
 // todo(): this implementation is flawed. Connections must be reused, not recreated.
 // Open returns a ReceiveFunc slice for reading packets and reports the bound port.
 // Since the UDP connection is pre-established, no new binding is performed (port is ignored).
-func (b *UDPBind) Open(_ uint16) (fns []conn.ReceiveFunc, actualPort uint16, err error) {
+func (b *UDPBind) Open(_ uint16) ([]conn.ReceiveFunc, uint16, error) {
 	b.logger.Info("bind: Open called on existing UDP connection")
 
 	// If the connection is nil or closed, we need to recreate it
@@ -52,7 +52,7 @@ func (b *UDPBind) Open(_ uint16) (fns []conn.ReceiveFunc, actualPort uint16, err
 
 	// Define function for receiving packets. This func receives batches of packets. Fills buffer with incoming data
 	// record how many bytes were read and capture sender address into endpoint type.
-	recvFn := func(bufs [][]byte, sizes []int, eps []conn.Endpoint) (n int, err error) {
+	recvFn := func(bufs [][]byte, sizes []int, eps []conn.Endpoint) (int, error) {
 		// Check if the buffers, sizes, and endpoints slices are valid
 		if len(bufs) == 0 || len(sizes) == 0 || len(eps) == 0 {
 			return 0, nil
@@ -71,7 +71,12 @@ func (b *UDPBind) Open(_ uint16) (fns []conn.ReceiveFunc, actualPort uint16, err
 		return 1, nil
 	}
 
-	return []conn.ReceiveFunc{recvFn}, uint16(localAddr.Port), nil
+	actualPort, err := udpPortToUint16(localAddr.Port)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return []conn.ReceiveFunc{recvFn}, actualPort, nil
 }
 
 // Close closes the underlying UDP connection.

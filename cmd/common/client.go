@@ -1,8 +1,10 @@
 package common
 
 import (
+	"context"
 	"fmt"
 	"net"
+	"strconv"
 
 	"github.com/go-logr/logr"
 	"github.com/yago-123/wg-punch/pkg/util"
@@ -14,8 +16,9 @@ type TCPClient struct {
 }
 
 func NewTCPClient(remoteAddr string, remotePort int, logger logr.Logger) (*TCPClient, error) {
-	remoteServerAddr := fmt.Sprintf("%s:%d", remoteAddr, remotePort)
-	conn, err := net.Dial(util.TCPProtocol, remoteServerAddr)
+	remoteServerAddr := net.JoinHostPort(remoteAddr, strconv.Itoa(remotePort))
+	var dialer net.Dialer
+	conn, err := dialer.DialContext(context.Background(), util.TCPProtocol, remoteServerAddr)
 	if err != nil {
 		logger.Error(err, "TCP client listen error", "address", remoteServerAddr)
 		return nil, fmt.Errorf("TCP client listen error: %w", err)

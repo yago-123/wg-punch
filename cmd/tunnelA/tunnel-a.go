@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -121,8 +121,9 @@ func main() {
 }
 
 func startTCPServer(logger *logrus.Logger) {
-	serverAddr := fmt.Sprintf("%s:%d", WGLocalIfaceAddr, TCPServerPort)
-	ln, err := net.Listen(util.TCPProtocol, serverAddr)
+	serverAddr := net.JoinHostPort(WGLocalIfaceAddr, strconv.Itoa(TCPServerPort))
+	var listenConfig net.ListenConfig
+	ln, err := listenConfig.Listen(context.Background(), util.TCPProtocol, serverAddr)
 	if err != nil {
 		logger.Errorf("TCP server listen error: %v", err)
 		return
@@ -161,8 +162,9 @@ func handleTCPConnection(c net.Conn, logger *logrus.Logger) {
 }
 
 func startTCPClient(logger *logrus.Logger) {
-	remoteServerAddr := fmt.Sprintf("%s:%d", WGRemoteIfaceAddr, TCPClientPort)
-	conn, err := net.Dial(util.TCPProtocol, remoteServerAddr)
+	remoteServerAddr := net.JoinHostPort(WGRemoteIfaceAddr, strconv.Itoa(TCPClientPort))
+	var dialer net.Dialer
+	conn, err := dialer.DialContext(context.Background(), util.TCPProtocol, remoteServerAddr)
 	if err != nil {
 		logger.Errorf("TCP dial error: %v", err)
 		return

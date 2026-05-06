@@ -1,10 +1,12 @@
 package common
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 
 	"github.com/go-logr/logr"
 	"github.com/yago-123/wg-punch/pkg/util"
@@ -22,8 +24,9 @@ type TCPServer struct {
 }
 
 func NewTCPServer(localAddr string, port int, logger logr.Logger) (*TCPServer, error) {
-	serverAddr := fmt.Sprintf("%s:%d", localAddr, port)
-	ln, err := net.Listen(util.TCPProtocol, serverAddr)
+	serverAddr := net.JoinHostPort(localAddr, strconv.Itoa(port))
+	var listenConfig net.ListenConfig
+	ln, err := listenConfig.Listen(context.Background(), util.TCPProtocol, serverAddr)
 	if err != nil {
 		logger.Error(err, "TCP server listen error", "address", serverAddr)
 		return nil, fmt.Errorf("TCP server listen error: %w", err)

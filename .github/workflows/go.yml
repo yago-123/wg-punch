@@ -16,4 +16,4 @@ jobs:
         uses: jdx/mise-action@v3
 
       - name: Lint code
-        run: make lint
+        run: mise run lint

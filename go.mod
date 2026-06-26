@@ -5,6 +5,7 @@ go 1.26.2
 require (
 	github.com/go-logr/logr v1.4.3
 	github.com/pion/stun v0.6.1
+	github.com/pion/stun/v3 v3.1.6
 	github.com/sirupsen/logrus v1.9.4
 	github.com/vishvananda/netlink v1.3.1
 	github.com/yago-123/peer-hub v0.0.0-20250424153946-19fd6d2b7af2
